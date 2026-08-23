@@ -1,0 +1,1 @@
+import { Navigation } from '@/components/navigation'; import { CdrConsole } from '@/components/cdr-console'; import { RoleGate } from '@/components/role-gate'; import { getLiveTables } from '@/lib/data'; export default async function Page(){return <><Navigation/><RoleGate allowed={['admin','head_waiter']}><CdrConsole tables={await getLiveTables()}/></RoleGate></>}

@@ -1,0 +1,4 @@
+'use client';
+import { useState } from 'react';
+import { supabase } from '@/lib/supabase/client';
+export function AuthPanel() { const [email,setEmail]=useState(''); const [notice,setNotice]=useState(''); async function signIn(){const {error}=await supabase.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin}});setNotice(error ? error.message : 'Lien de connexion envoyé.');} return <form className="panel mb-5 flex flex-wrap items-center gap-2 p-3" onSubmit={e=>{e.preventDefault();signIn()}}><span className="text-sm text-zinc-400">Accès sécurisé</span><input required type="email" placeholder="email@etablissement.fr" className="min-w-52 flex-1 rounded-lg bg-zinc-800 px-3 py-2" value={email} onChange={e=>setEmail(e.target.value)}/><button className="rounded-lg bg-zinc-700 px-4 py-2 text-sm font-semibold">Recevoir un lien</button>{notice&&<span className="text-xs text-zinc-400">{notice}</span>}</form> }

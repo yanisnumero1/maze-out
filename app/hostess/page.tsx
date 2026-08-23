@@ -1,0 +1,1 @@
+import { Navigation } from '@/components/navigation'; import { HostessConsole } from '@/components/hostess-console'; import { RoleGate } from '@/components/role-gate'; import { getLiveTables } from '@/lib/data'; export default async function Page(){return <><Navigation/><RoleGate allowed={['admin','hostess']}><HostessConsole tables={await getLiveTables()}/></RoleGate></>}

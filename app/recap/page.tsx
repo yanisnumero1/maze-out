@@ -1,0 +1,1 @@
+import { Navigation } from '@/components/navigation'; import { RecapConsole } from '@/components/recap-console'; import { RoleGate } from '@/components/role-gate'; import { getLiveTables } from '@/lib/data'; export default async function Page(){return <><Navigation/><RoleGate allowed={['admin','observer']}><RecapConsole tables={await getLiveTables()}/></RoleGate></>}
