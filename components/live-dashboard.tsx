@@ -14,9 +14,10 @@ const normalise = (rows: any[]): LiveTable[] => rows.map((table) => ({
   occupancy: Array.isArray(table.occupancy) ? table.occupancy[0] ?? null : table.occupancy,
 }));
 
-function status(available: number, total: number) {
-  if (!available) return { label: '🔴 COMPLET', color: 'text-red-300' };
-  if (available / total <= 0.25) return { label: '🟠 CHARGÉ', color: 'text-orange-300' };
+function status(available: number, total: number, clients: number, maxCapacity?: number | null) {
+  const capacityRate = maxCapacity ? clients / maxCapacity : 0;
+  if (!available || (maxCapacity && clients >= maxCapacity)) return { label: '🔴 COMPLET', color: 'text-red-300' };
+  if (available / total <= 0.25 || capacityRate >= 0.7) return { label: '🟠 CHARGÉ', color: 'text-orange-300' };
   return { label: '🟢 OUVERT', color: 'text-emerald-300' };
 }
 
@@ -162,7 +163,7 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
           {zones.map((zone, index) => {
             const scoped = tables.filter((table) => table.zone_id === zone.id);
             const summary = stats(scoped);
-            const state = status(summary.available, scoped.length);
+            const state = status(summary.available, scoped.length, summary.present, zone.max_capacity);
 
             return (
               <article className={`panel min-h-64 border p-6 ${accents[index % 4]}`} key={zone.id}>
@@ -175,6 +176,7 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
                   <div><p className="text-3xl font-black">{summary.occupied}</p><p className="text-sm text-zinc-400">occupées</p></div>
                   <div><p className="text-3xl font-black">{summary.present}</p><p className="text-sm text-zinc-400">clients présents</p></div>
                   <div><p className="text-3xl font-black">{summary.available}</p><p className="text-sm text-zinc-400">tables disponibles</p></div>
+                  {zone.max_capacity && <div><p className="text-3xl font-black">{zone.max_capacity}</p><p className="text-sm text-zinc-400">capacité max</p></div>}
                 </div>
               </article>
             );

@@ -40,6 +40,7 @@ export function AdminConsole({ tables }: { tables: LiveTable[] }) {
   return (
     <>
       <header><p className="text-sm uppercase tracking-[.25em] text-fuchsia-400">Configuration de la soirée</p><h1 className="mb-5 text-3xl font-black">ADMINISTRATION</h1></header>
+      <section className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{zones.map((zone) => { const scoped = rows.filter((table) => table.zone_id === zone.id); const zoneCdrs = new Set(scoped.map((table) => table.head_waiter_id).filter(Boolean)).size; return <article className="panel p-4" key={zone.id}><b className="block text-lg">{zone.name}</b><p className="mt-2 text-sm text-zinc-400">{scoped.length} tables · {zoneCdrs} CDR</p><p className="text-sm text-zinc-400">Capacité max {zone.max_capacity ?? '—'}</p></article>; })}</section>
       <section className="panel overflow-x-auto p-4">
         <h2 className="mb-3 text-xl font-bold">Tables</h2>
         <table className="w-full min-w-[680px] text-sm">
