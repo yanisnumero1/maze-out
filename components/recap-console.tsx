@@ -28,7 +28,7 @@ export function RecapConsole() {
     async function load() {
       const [{ data: sessionRows, error: sessionError }, { data: tableRows, error: tableError }, { data: visitRows, error: visitError }] = await Promise.all([
         supabase.from('night_sessions').select('*').order('started_at', { ascending: false }),
-        supabase.from('tables').select('*, zone:zones(*), head_waiter:head_waiters(*), reservation:reservations(*), occupancy:occupancies(*)').eq('active', true).order('number'),
+        supabase.from('tables').select('*, zone:zones(*), head_waiter:head_waiters(*), reservation:reservations(*), occupancy:occupancies(*)').eq('active', true).order('display_number'),
         supabase.from('table_visits').select('*, zone:zones(*), head_waiter:head_waiters(*)').order('arrived_at'),
       ]);
       if (sessionError || tableError || visitError) {
@@ -54,7 +54,7 @@ export function RecapConsole() {
   const global = useMemo(() => activitySummary(visits, tables.length), [tables.length, visits]);
   const zones = useMemo(() => recapZones(tables, visits), [tables, visits]);
   const waiters = useMemo(() => recapWaiters(tables, visits), [tables, visits]);
-  const tableNumbers = useMemo(() => new Map(tables.map((table) => [table.id, table.number])), [tables]);
+  const tableNumbers = useMemo(() => new Map(tables.map((table) => [table.id, table.display_number])), [tables]);
 
   function summaryFor(session: NightSession) {
     return activitySummary(allVisits.filter((visit) => visit.night_session_id === session.id), tables.length);

@@ -76,7 +76,7 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
         .from('tables')
         .select('*, zone:zones(*), head_waiter:head_waiters(*), reservation:reservations(*), occupancy:occupancies(*)')
         .eq('active', true)
-        .order('number');
+        .order('display_number');
 
       if (tablesError) {
         console.error('[LIVE] Chargement des tables impossible.', tablesError);

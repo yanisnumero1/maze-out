@@ -19,7 +19,7 @@ export function AdminConsole({ tables }: { tables: LiveTable[] }) {
         .from('tables')
         .select('*, zone:zones(*), head_waiter:head_waiters(*), reservation:reservations(*), occupancy:occupancies(*)')
         .eq('active', true)
-        .order('number');
+        .order('display_number');
       if (error) {
         console.error('[ADMIN] Chargement des tables impossible.', error);
         return;
@@ -46,7 +46,7 @@ export function AdminConsole({ tables }: { tables: LiveTable[] }) {
         <table className="w-full min-w-[680px] text-sm">
           <thead className="text-left text-zinc-400"><tr><th>Table</th><th>Zone</th><th>CDR</th><th>Capacité</th><th>État</th></tr></thead>
           <tbody>{rows.map((table) => <tr className="border-t border-zinc-800" key={table.id}>
-            <td><input className="w-14 bg-transparent py-3 font-bold" value={table.number} onChange={(event) => void update(table.id, { number: event.target.value })} /></td>
+            <td><b className="block py-3">Table {table.display_number}</b></td>
             <td><select className="bg-zinc-800 p-2" value={table.zone_id} onChange={(event) => void update(table.id, { zone_id: event.target.value })}>{zones.map((zone) => <option value={zone.id} key={zone.id}>{zone.name}</option>)}</select></td>
             <td><select className="bg-zinc-800 p-2" value={table.head_waiter_id ?? ''} onChange={(event) => void update(table.id, { head_waiter_id: event.target.value || null })}><option value="">Aucun</option>{cdrs.map((cdr) => <option value={cdr.id} key={cdr.id}>{cdr.first_name} {cdr.last_name}</option>)}</select></td>
             <td><input className="w-14 bg-zinc-800 p-2" type="number" value={table.standard_capacity} onChange={(event) => void update(table.id, { standard_capacity: +event.target.value })} /></td>
