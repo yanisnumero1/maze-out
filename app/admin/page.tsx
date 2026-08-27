@@ -1,1 +1,7 @@
-import { Navigation } from '@/components/navigation'; import { AdminConsole } from '@/components/admin-console'; import { RoleGate } from '@/components/role-gate'; import { getLiveTables } from '@/lib/data'; export default async function Page(){return <><Navigation/><RoleGate allowed={['admin']}><AdminConsole tables={await getLiveTables()}/></RoleGate></>}
+import { AdminConsole } from '@/components/admin-console';
+import { AuthGate } from '@/components/auth-gate';
+import { Navigation } from '@/components/navigation';
+
+export default function AdminPage() {
+  return <AuthGate requireAdmin><Navigation /><AdminConsole tables={[]} /></AuthGate>;
+}

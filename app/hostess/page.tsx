@@ -1,1 +1,7 @@
-import { Navigation } from '@/components/navigation'; import { HostessConsole } from '@/components/hostess-console'; import { RoleGate } from '@/components/role-gate'; import { getLiveTables } from '@/lib/data'; export default async function Page(){return <><Navigation/><RoleGate allowed={['admin','hostess']}><HostessConsole tables={await getLiveTables()}/></RoleGate></>}
+import { AuthGate } from '@/components/auth-gate';
+import { HostessConsole } from '@/components/hostess-console';
+import { Navigation } from '@/components/navigation';
+
+export default function HostessPage() {
+  return <AuthGate><Navigation /><HostessConsole tables={[]} /></AuthGate>;
+}
