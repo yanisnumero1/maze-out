@@ -41,6 +41,7 @@ export function Navigation() {
       <Link className="rounded-full bg-zinc-800 px-3 py-2 font-semibold" href="/">Accueil</Link>
       <Link className="rounded-full bg-fuchsia-600 px-3 py-2 font-semibold" href="/hostess">Hôtesse</Link>
       {role === 'admin' && <Link className="rounded-full bg-zinc-800 px-3 py-2 font-semibold" href="/admin">Administration</Link>}
+      {role === 'admin' && <Link className="rounded-full bg-zinc-800 px-3 py-2 font-semibold" href={'/recap' as any}>Récapitulatif</Link>}
       <button className="rounded-full bg-zinc-800 px-3 py-2 font-semibold" onClick={() => void signOut()}>Se déconnecter</button>
     </nav>
   );
