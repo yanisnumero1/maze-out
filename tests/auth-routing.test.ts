@@ -8,6 +8,7 @@ const navigation = file('components/navigation.tsx');
 const home = file('app/page.tsx');
 const hostess = file('app/hostess/page.tsx');
 const admin = file('app/admin/page.tsx');
+const recap = file('app/recap/page.tsx');
 
 describe('authentification et navigation', () => {
   it('redirige les visiteurs sans session vers /login', () => {
@@ -18,6 +19,10 @@ describe('authentification et navigation', () => {
   it('empêche une hôtesse d’accéder à /admin', () => {
     expect(admin).toContain('<AuthGate requireAdmin>');
     expect(gate).toContain("router.replace('/')");
+  });
+
+  it('réserve /recap aux administrateurs', () => {
+    expect(recap).toContain('<AuthGate requireAdmin>');
   });
 
   it('ne charge pas les données métier côté serveur avant le garde', () => {
@@ -32,7 +37,7 @@ describe('authentification et navigation', () => {
     expect(navigation).toContain('Hôtesse');
     expect(navigation).toContain('Administration');
     expect(navigation).toContain("role === 'admin'");
-    expect(navigation).not.toContain('Récap');
+    expect(navigation).toContain('Récapitulatif');
     expect(navigation).not.toContain('CDR');
   });
 

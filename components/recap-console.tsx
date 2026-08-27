@@ -18,6 +18,8 @@ export function RecapConsole() {
   const [visits, setVisits] = useState<TableVisit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [closing, setClosing] = useState(false);
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     async function loadBase() {
@@ -87,13 +89,19 @@ export function RecapConsole() {
   }
 
   async function closeNight() {
+    setClosing(true);
+    setError('');
     const { error: closeError } = await supabase.rpc('close_current_night_session');
     if (closeError) {
       console.error('[RECAP] Clôture de la soirée impossible.', closeError);
       setError('Impossible de clôturer la soirée.');
+      setClosing(false);
       return;
     }
-    window.location.reload();
+    const endedAt = new Date().toISOString();
+    setSessions((current) => current.map((session) => session.id === sessionId ? { ...session, ended_at: endedAt } : session));
+    setNotice('Soirée clôturée');
+    setClosing(false);
   }
 
   if (loading) return <p className="panel p-5 text-zinc-400">Chargement…</p>;
@@ -102,7 +110,9 @@ export function RecapConsole() {
   return (
     <>
       <header className="mb-5"><p className="text-sm uppercase tracking-[.25em] text-fuchsia-400">Bilan opérationnel</p><h1 className="text-3xl font-black">RÉCAPITULATIF DE LA SOIRÉE</h1></header>
-      {sessions.length > 0 ? <div className="mb-5 flex flex-wrap gap-3"><select className="rounded-xl bg-zinc-800 px-4 py-3" value={sessionId} onChange={(event) => setSessionId(event.target.value)}>{sessions.map((session) => <option key={session.id} value={session.id}>{new Date(session.started_at).toLocaleString('fr-FR')} {session.ended_at ? '— clôturée' : '— en cours'}</option>)}</select><button onClick={download} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold">Exporter CSV</button>{selected && !selected.ended_at && <button onClick={() => void closeNight()} className="rounded-xl bg-zinc-800 px-5 py-3 font-bold">Clôturer la soirée</button>}</div> : <p className="panel mb-5 p-5 text-zinc-400">Aucune activité historisée pour le moment. La première arrivée créera automatiquement la soirée en cours.</p>}
+      {sessions.length > 0 ? <div className="mb-5 flex flex-wrap gap-3"><select className="rounded-xl bg-zinc-800 px-4 py-3" value={sessionId} onChange={(event) => setSessionId(event.target.value)}>{sessions.map((session) => <option key={session.id} value={session.id}>{new Date(session.started_at).toLocaleString('fr-FR')} {session.ended_at ? '— clôturée' : '— en cours'}</option>)}</select><button onClick={download} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold">Exporter CSV</button>{selected && !selected.ended_at && <button onClick={() => setClosing(true)} className="rounded-xl bg-zinc-800 px-5 py-3 font-bold">Clôturer la soirée</button>}</div> : <p className="panel mb-5 p-5 text-zinc-400">Aucune activité historisée pour le moment. La première arrivée créera automatiquement la soirée en cours.</p>}
+      {closing && <section className="panel mb-5 border-orange-500/40 p-5"><h2 className="text-lg font-bold">Clôturer la soirée ?</h2><p className="mt-2 text-sm text-zinc-300">Cette action va figer le récapitulatif et remettre toutes les tables à zéro pour la prochaine soirée.</p><div className="mt-5 flex gap-3"><button className="rounded-xl bg-zinc-800 px-4 py-3 font-bold" onClick={() => setClosing(false)}>Annuler</button><button className="rounded-xl bg-orange-500 px-4 py-3 font-bold text-zinc-950" onClick={() => void closeNight()}>Clôturer la soirée</button></div></section>}
+      {notice && <p className="mb-5 text-sm font-semibold text-emerald-300">{notice}</p>}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">{[['Clients accueillis', global.clients], ['Tables utilisées', `${global.usedTables} / ${global.totalTables}`], ['Taux d’utilisation', `${global.usageRate} %`], ['Invités supplémentaires', global.extraGuests], ['Tables totales', global.totalTables]].map(([label, value]) => <div className="panel p-4" key={String(label)}><small>{label}</small><b className="block text-2xl">{value}</b></div>)}</section>
       <section className="mt-6"><h2 className="mb-3 text-xl font-bold">ACTIVITÉ PAR CARRÉ</h2><div className="grid gap-4 sm:grid-cols-2">{zones.map(({ zone, summary }) => <article className="panel p-5" key={zone.id}><h3 className="text-xl font-black">{zone.name}</h3><p className="mt-4">{summary.clients} clients accueillis</p><p>{summary.usedTables} / {summary.totalTables} tables utilisées</p><p>{summary.usageRate} % d’utilisation</p><p>{summary.extraGuests} invités supplémentaires</p></article>)}</div></section>
       <section className="mt-6"><h2 className="mb-3 text-xl font-bold">ACTIVITÉ PAR CHEF DE RANG</h2><div className="grid gap-4 sm:grid-cols-2">{waiters.map(({ waiter, assignedTables, summary }) => <article className="panel p-5" key={waiter.id}><h3 className="text-xl font-black">{waiter.first_name} {waiter.last_name}</h3><p className="mt-4">{assignedTables} tables affectées</p><p>{summary.usedTables} tables utilisées</p><p>{summary.clients} clients accueillis</p><p>{summary.extraGuests} invités supplémentaires</p></article>)}</div></section>

@@ -1,5 +1,5 @@
 export type TableStatus = 'free' | 'reserved' | 'occupied' | 'light_overload' | 'overload' | 'unavailable';
-export type ReservationStatus = 'reserved' | 'arrived' | 'cancelled' | 'no_show';
+export type ReservationStatus = 'reserved' | 'arrived' | 'cancelled' | 'no_show' | 'completed';
 export type Role = 'admin' | 'hostess' | 'head_waiter' | 'observer';
 export interface Zone { id: string; name: string; display_order: number; active: boolean }
 export interface HeadWaiter { id: string; first_name: string; last_name: string; color: string | null; active: boolean }
