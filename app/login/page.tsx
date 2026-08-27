@@ -65,10 +65,10 @@ export default function LoginPage() {
     <section className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-sm items-center">
       <div className="w-full">
         <Image
-          src="/bridge-logo.svg"
+          src="/bridge-logo.png"
           alt="BRIDGE — Pont Alexandre III"
           width={480}
-          height={112}
+          height={172}
           priority
           className="mx-auto mb-12 w-64"
         />

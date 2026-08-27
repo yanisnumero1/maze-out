@@ -36,7 +36,7 @@ export function Navigation() {
   return (
     <nav className="mb-5 flex items-center gap-2 border-b border-zinc-800 pb-3 text-sm">
       <Link href="/" className="mr-auto flex items-center">
-        <Image src="/bridge-logo.svg" alt="BRIDGE — Pont Alexandre III" width={160} height={38} className="h-8 w-32 object-contain" />
+        <Image src="/bridge-logo.png" alt="BRIDGE — Pont Alexandre III" width={160} height={57} className="h-8 w-32 object-contain" />
       </Link>
       <Link className="rounded-full bg-zinc-800 px-3 py-2 font-semibold" href="/">Accueil</Link>
       <Link className="rounded-full bg-fuchsia-600 px-3 py-2 font-semibold" href="/hostess">Hôtesse</Link>
