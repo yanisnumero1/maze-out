@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const migration = readFileSync(resolve(process.cwd(), 'supabase/migrations/0014_reset_test_operational_data.sql'), 'utf8');
+const correction = readFileSync(resolve(process.cwd(), 'supabase/migrations/0015_fix_operational_reset.sql'), 'utf8');
 const admin = readFileSync(resolve(process.cwd(), 'components/admin-console.tsx'), 'utf8');
 
 describe('réinitialisation propre des données de test', () => {
@@ -46,5 +47,22 @@ describe('réinitialisation propre des données de test', () => {
     expect(admin).toContain("resetWord !== 'RESET'");
     expect(admin).toContain('Réinitialisation en cours...');
     expect(admin).toContain("supabase.rpc('reset_test_operational_data')");
+  });
+
+  it('corrige tous les DELETE globaux refusés par Supabase', () => {
+    const deletes = correction.match(/delete from public\.[a-z_]+[^;]*;/gi) ?? [];
+    expect(deletes).toHaveLength(9);
+    deletes.forEach((statement) => expect(statement.toLowerCase()).toContain('where'));
+    expect(correction).toContain('update public.occupancies');
+    expect(correction).toContain('where table_id is not null');
+  });
+
+  it('préserve les contrôles de rôle et les vérifications de configuration dans la fonction remplacée', () => {
+    expect(correction).toContain("public.current_role() <> 'admin'");
+    expect(correction).toContain('security definer');
+    expect(correction).toContain('revoke all on function public.reset_test_operational_data() from public, anon');
+    expect(correction).toContain("'Expected 72 active tables'");
+    expect(correction).toContain("'Active CDR assignments are invalid'");
+    expect(correction).toContain("'Zone capacities are invalid'");
   });
 });
