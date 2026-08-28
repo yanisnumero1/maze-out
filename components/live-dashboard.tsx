@@ -2,6 +2,7 @@
 
 import type { Session } from '@supabase/supabase-js';
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { stats, zoneAvailabilityStatus } from '@/lib/live';
 import { supabase } from '@/lib/supabase/client';
 import type { LiveTable } from '@/lib/types';
@@ -22,6 +23,7 @@ function status(available: number, clients: number, maxCapacity?: number | null)
 }
 
 export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] }) {
+  const router = useRouter();
   const [tables, setTables] = useState(initialTables);
   const [updated, setUpdated] = useState(new Date());
   const [loading, setLoading] = useState(true);
@@ -166,7 +168,13 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
             const state = status(summary.available, summary.present, zone.max_capacity);
 
             return (
-              <article className={`panel min-h-64 border p-6 ${accents[index % 4]}`} key={zone.id}>
+              <button
+                type="button"
+                aria-label={`Ouvrir la vue salle ${zone.name}`}
+                className={`panel min-h-64 w-full border p-6 text-left transition hover:bg-zinc-900/80 ${accents[index % 4]}`}
+                key={zone.id}
+                onClick={() => router.push(`/hostess?zone=${encodeURIComponent(zone.id)}`)}
+              >
                 <div className="flex justify-between gap-3">
                   <h2 className="text-2xl font-black">{zone.name}</h2>
                   <span className={`text-sm font-bold ${state.color}`}>{state.label}</span>
@@ -178,7 +186,7 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
                   <div><p className="text-3xl font-black">{summary.available}</p><p className="text-sm text-zinc-400">tables disponibles</p></div>
                   {zone.max_capacity && <div><p className="text-3xl font-black">{zone.max_capacity}</p><p className="text-sm text-zinc-400">capacité max</p></div>}
                 </div>
-              </article>
+              </button>
             );
           })}
         </section>
