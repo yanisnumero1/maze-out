@@ -8,5 +8,6 @@ export interface Reservation { id: string; table_id: string; client_name: string
 export interface Occupancy { table_id: string; present_people: number; extra_guests: number; comment: string | null; arrived_at: string | null; updated_at: string }
 export type LiveTable = NightTable & { zone: Zone; head_waiter: HeadWaiter | null; reservation: Reservation | null; occupancy: Occupancy | null };
 export interface NightSession { id: string; started_at: string; ended_at: string | null; created_at: string }
-export interface TableVisit { id: string; night_session_id: string; table_id: string; zone_id: string; head_waiter_id: string | null; present_people: number; extra_guests: number; comment: string | null; arrived_at: string; ended_at: string | null; zone: Zone; head_waiter: HeadWaiter | null }
+export interface TableVisit { id: string; night_session_id: string; table_id: string; zone_id: string; head_waiter_id: string | null; present_people: number; extra_guests: number; comment: string | null; arrived_at: string; ended_at: string | null; sale_number?: number | null; zone: Zone; head_waiter: HeadWaiter | null }
+export interface ArrivalDraft { id: string; table_id: string; actor_id: string; present_people: number; extra_guests: number; comment: string | null; status: 'draft' | 'confirmed' | 'cancelled'; confirmed_sale_number: number | null; created_at: string; updated_at: string; confirmed_at: string | null }
 export interface Thresholds { lightOverloadFrom: number; overloadFrom: number }
