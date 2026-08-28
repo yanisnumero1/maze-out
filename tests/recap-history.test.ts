@@ -21,7 +21,7 @@ describe('historique des soirées', () => {
   });
 
   it('exporte les lignes historiques avec carré, CDR, table et horaires', () => {
-    expect(recap).toContain("['Date', 'Carré', 'Chef de rang', 'Table', 'Clients', 'Invités', 'Total', 'Heure arrivée', 'Heure fin']");
+    expect(recap).toContain("['date', 'carré', 'CDR', 'table', 'vente', 'personnes', 'invités', 'total', 'arrivée', 'fin']");
     expect(recap).toContain('formatTime(visit.arrived_at)');
     expect(recap).toContain('formatTime(visit.ended_at)');
   });

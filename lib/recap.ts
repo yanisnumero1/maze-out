@@ -1,4 +1,4 @@
-import type { HeadWaiter, LiveTable, TableVisit, Zone } from './types';
+import type { ClubEntryCount, FloorNote, HeadWaiter, LiveTable, Promoter, TableVisit, Zone } from './types';
 
 export type ActivitySummary = {
   clients: number;
@@ -35,3 +35,38 @@ export const recapWaiters = (tables: LiveTable[], visits: TableVisit[]) => {
     };
   });
 };
+
+export type RecapTable = {
+  tableId: string;
+  tableNumber: number | string;
+  zone: Zone | null;
+  waiter: HeadWaiter | null;
+  visits: TableVisit[];
+  sales: number;
+  people: number;
+  extraGuests: number;
+};
+
+export const recapTables = (visits: TableVisit[], tableNumbers: Map<string, number | string>) => {
+  const grouped = new Map<string, TableVisit[]>();
+  visits.forEach((visit) => grouped.set(visit.table_id, [...(grouped.get(visit.table_id) ?? []), visit]));
+  return [...grouped.entries()].map(([tableId, tableVisits]) => {
+    const chronological = [...tableVisits].sort((left, right) => new Date(left.arrived_at).getTime() - new Date(right.arrived_at).getTime());
+    return {
+      tableId,
+      tableNumber: tableNumbers.get(tableId) ?? tableId,
+      zone: chronological[0]?.zone ?? null,
+      waiter: chronological[0]?.head_waiter ?? null,
+      visits: chronological,
+      sales: chronological.length,
+      people: chronological.reduce((total, visit) => total + visit.present_people + visit.extra_guests, 0),
+      extraGuests: chronological.reduce((total, visit) => total + visit.extra_guests, 0),
+    } satisfies RecapTable;
+  }).sort((left, right) => Number(left.tableNumber) - Number(right.tableNumber));
+};
+
+export const recapRotations = (tables: RecapTable[]) => [...tables].sort((left, right) => right.sales - left.sales || Number(left.tableNumber) - Number(right.tableNumber));
+
+export const finalClubEntryCount = (counts: ClubEntryCount[]) => [...counts].sort((left, right) => new Date(right.recorded_at).getTime() - new Date(left.recorded_at).getTime())[0]?.count ?? 0;
+export const promoterTotal = (promoters: Promoter[]) => promoters.reduce((total, promoter) => total + promoter.entry_count, 0);
+export const selectedNightNotes = (notes: FloorNote[], nightSessionId: string) => notes.filter((note) => note.night_session_id === nightSessionId).sort((left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime());
