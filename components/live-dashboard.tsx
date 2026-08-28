@@ -2,7 +2,7 @@
 
 import type { Session } from '@supabase/supabase-js';
 import { useEffect, useMemo, useState } from 'react';
-import { stats } from '@/lib/live';
+import { stats, zoneAvailabilityStatus } from '@/lib/live';
 import { supabase } from '@/lib/supabase/client';
 import type { LiveTable } from '@/lib/types';
 
@@ -14,10 +14,10 @@ const normalise = (rows: any[]): LiveTable[] => rows.map((table) => ({
   occupancy: Array.isArray(table.occupancy) ? table.occupancy[0] ?? null : table.occupancy,
 }));
 
-function status(available: number, total: number, clients: number, maxCapacity?: number | null) {
-  const capacityRate = maxCapacity ? clients / maxCapacity : 0;
-  if (!available || (maxCapacity && clients >= maxCapacity)) return { label: '🔴 COMPLET', color: 'text-red-300' };
-  if (available / total <= 0.25 || capacityRate >= 0.7) return { label: '🟠 CHARGÉ', color: 'text-orange-300' };
+function status(available: number, clients: number, maxCapacity?: number | null) {
+  const value = zoneAvailabilityStatus(clients, maxCapacity, available);
+  if (value === 'complete') return { label: '🔴 COMPLET', color: 'text-red-300' };
+  if (value === 'charged') return { label: '🟠 CHARGÉ', color: 'text-orange-300' };
   return { label: '🟢 OUVERT', color: 'text-emerald-300' };
 }
 
@@ -163,7 +163,7 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
           {zones.map((zone, index) => {
             const scoped = tables.filter((table) => table.zone_id === zone.id);
             const summary = stats(scoped);
-            const state = status(summary.available, scoped.length, summary.present, zone.max_capacity);
+            const state = status(summary.available, summary.present, zone.max_capacity);
 
             return (
               <article className={`panel min-h-64 border p-6 ${accents[index % 4]}`} key={zone.id}>

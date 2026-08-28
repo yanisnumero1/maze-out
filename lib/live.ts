@@ -16,6 +16,12 @@ export function stats(tables: LiveTable[], thresholds = defaultThresholds) {
 }
 export function recommend(tables: LiveTable[], partySize: number) { return tables.filter(t => computedStatus(t)==='free').sort((a,b) => (b.standard_capacity-partySize)-(a.standard_capacity-partySize)); }
 export function zoneStats(tables: LiveTable[], zoneId: string, thresholds = defaultThresholds) { return stats(tables.filter(t => t.zone_id === zoneId), thresholds); }
+export function zoneAvailabilityStatus(clients: number, maxCapacity: number | null | undefined, availableTables: number) {
+  if (maxCapacity && clients >= maxCapacity) return 'complete' as const;
+  if (maxCapacity && clients / maxCapacity >= 0.7) return 'charged' as const;
+  if (!maxCapacity && availableTables === 0) return 'complete' as const;
+  return 'open' as const;
+}
 export function zoneRecommendations(tables: LiveTable[], partySize: number) { const zones=[...new Map(tables.map(t=>[t.zone.id,t.zone])).values()]; return zones.map(zone=>{const scoped=tables.filter(t=>t.zone_id===zone.id);const s=stats(scoped);const candidates=recommend(scoped,partySize).slice(0,3);return {zone,stats:s,tables:candidates,score:s.available*100+(s.capacity-s.present)*2-s.fillRate-s.overload*30};}).filter(x=>x.tables.length>0).sort((a,b)=>b.score-a.score); }
 export type LiveAlert={level:'critical'|'warning';label:string};
 export function alerts(tables: LiveTable[]):LiveAlert[] { const zones=[...new Map(tables.map(t=>[t.zone.id,t.zone])).values()]; const zoneLoad=zones.map(z=>({zone:z,fillRate:zoneStats(tables,z.id).fillRate}));const lowest=zoneLoad.reduce((a,b)=>a.fillRate<b.fillRate?a:b,{zone:{name:''} as any,fillRate:100});const highest=zoneLoad.reduce((a,b)=>a.fillRate>b.fillRate?a:b,{zone:{name:''} as any,fillRate:0});const imbalance=zoneLoad.length>1&&highest.fillRate-lowest.fillRate>=35?[{level:'warning' as const,label:`Répartition déséquilibrée — privilégier ${lowest.zone.name}`}]:[]; return [...imbalance,...zones.flatMap<LiveAlert>(z=>{const s=zoneStats(tables,z.id);return s.available===0?[{level:'critical',label:`${z.name} — aucune table disponible`}]:s.available<=2?[{level:'warning',label:`${z.name} — seulement ${s.available} table(s) disponible(s)`}]:[]}),...tables.flatMap<LiveAlert>(t=>{const total=presentTotal(t);const number=t.display_number??t.number;return total>=10?[{level:'critical',label:`Table ${number} — ${total} personnes`}]:total>=8?[{level:'warning',label:`Table ${number} — ${total} personnes`}]:[]})]; }
