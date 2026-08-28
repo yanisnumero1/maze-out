@@ -67,6 +67,16 @@ describe('Lot 4 — opérations de soirée', () => {
     expect(operations).toContain('console.error');
   });
 
+  it('trace chaque RPC et met à jour la liste avant le SELECT de confirmation', () => {
+    for (const rpc of ['add_floor_note', 'update_floor_note', 'delete_floor_note', 'add_promoter', 'set_promoter_count', 'delete_promoter', 'record_club_entry_count', 'update_club_entry_count', 'delete_club_entry_count']) {
+      expect(operations).toContain('RPC ' + rpc);
+    }
+    expect(operations).toContain('Listes Supabase chargées.');
+    expect(operations).toContain('setNotes((rows) => [data as FloorNote');
+    expect(operations).toContain('setPromoters((rows) => [...rows.filter');
+    expect(operations).toContain('setEntries((rows) => [result.data as ClubEntryCount');
+  });
+
   it('permet la suppression confirmée d’un promoteur et accorde les accès API requis', () => {
     expect(correction).toContain('create or replace function public.delete_promoter');
     expect(correction).toContain('grant select on public.floor_notes, public.promoters');

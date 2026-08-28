@@ -24,6 +24,7 @@ export function HostessOperations({ view }: { view: OperationView }) {
     setLoading(true);
     const { data: currentNight, error: nightError } = await supabase.rpc('current_operational_night_session');
     if (nightError) { console.error('[OPERATIONS] Soirée active introuvable.', nightError); setNotice(`Impossible de charger les données : ${nightError.message}`); setLoading(false); return; }
+    console.info('[OPERATIONS] Soirée active chargée.', { nightSessionId: currentNight });
     if (!currentNight) { setNotes([]); setPromoters([]); setEntries([]); setNotice(''); setLoading(false); return; }
     const [{ data: noteRows, error: notesError }, { data: promoterRows, error: promotersError }, { data: entryRows, error: entriesError }] = await Promise.all([
       supabase.from('floor_notes').select('*').eq('night_session_id', currentNight).order('created_at', { ascending: false }),
@@ -39,6 +40,7 @@ export function HostessOperations({ view }: { view: OperationView }) {
     setNotes((noteRows ?? []) as FloorNote[]);
     setPromoters((promoterRows ?? []) as Promoter[]);
     setEntries((entryRows ?? []) as ClubEntryCount[]);
+    console.info('[OPERATIONS] Listes Supabase chargées.', { nightSessionId: currentNight, notes: noteRows?.length ?? 0, promoters: promoterRows?.length ?? 0, entryCounts: entryRows?.length ?? 0 });
     setLoading(false);
   }
 
@@ -53,35 +55,47 @@ export function HostessOperations({ view }: { view: OperationView }) {
   }, []);
 
   async function addNote() {
-    const { error } = await supabase.rpc('add_floor_note', { p_content: noteText });
-    if (error) return setNotice(error.message);
+    const { data, error } = await supabase.rpc('add_floor_note', { p_content: noteText });
+    console.info('[OPERATIONS] RPC add_floor_note.', { data, error });
+    if (error || !data) return setNotice(error?.message ?? 'La note Piste n’a pas été enregistrée.');
+    setNotes((rows) => [data as FloorNote, ...rows.filter((note) => note.id !== data.id)]);
     setNoteText(''); setNotice(''); await refresh();
   }
   async function saveNote(note: FloorNote, content: string) {
-    const { error } = await supabase.rpc('update_floor_note', { p_note_id: note.id, p_content: content });
-    if (error) return setNotice(error.message);
+    const { data, error } = await supabase.rpc('update_floor_note', { p_note_id: note.id, p_content: content });
+    console.info('[OPERATIONS] RPC update_floor_note.', { data, error });
+    if (error || !data) return setNotice(error?.message ?? 'La note Piste n’a pas été modifiée.');
+    setNotes((rows) => rows.map((row) => row.id === note.id ? data as FloorNote : row));
     setEditingNote(null); setNotice(''); await refresh();
   }
   async function deleteNote(id: string) {
     if (!window.confirm('Supprimer cette note Piste ?')) return;
-    const { error } = await supabase.rpc('delete_floor_note', { p_note_id: id });
+    const { data, error } = await supabase.rpc('delete_floor_note', { p_note_id: id });
+    console.info('[OPERATIONS] RPC delete_floor_note.', { data, error });
     if (error) return setNotice(error.message);
+    setNotes((rows) => rows.filter((note) => note.id !== id));
     setNotice(''); await refresh();
   }
   async function addPromoter() {
-    const { error } = await supabase.rpc('add_promoter', { p_name: promoterName });
-    if (error) return setNotice(error.message);
+    const { data, error } = await supabase.rpc('add_promoter', { p_name: promoterName });
+    console.info('[OPERATIONS] RPC add_promoter.', { data, error });
+    if (error || !data) return setNotice(error?.message ?? 'Le promoteur n’a pas été enregistré.');
+    setPromoters((rows) => [...rows.filter((promoter) => promoter.id !== data.id), data as Promoter].sort((left, right) => left.name.localeCompare(right.name, 'fr')));
     setPromoterName(''); setNotice(''); await refresh();
   }
   async function setPromoter(promoter: Promoter, value: number) {
-    const { error } = await supabase.rpc('set_promoter_count', { p_promoter_id: promoter.id, p_entry_count: nonNegative(value) });
-    if (error) return setNotice(error.message);
+    const { data, error } = await supabase.rpc('set_promoter_count', { p_promoter_id: promoter.id, p_entry_count: nonNegative(value) });
+    console.info('[OPERATIONS] RPC set_promoter_count.', { data, error });
+    if (error || !data) return setNotice(error?.message ?? 'Le compteur Promoteur n’a pas été modifié.');
+    setPromoters((rows) => rows.map((row) => row.id === promoter.id ? data as Promoter : row));
     setNotice(''); await refresh();
   }
   async function deletePromoter(id: string) {
     if (!window.confirm('Supprimer ce promoteur de la soirée active ?')) return;
-    const { error } = await supabase.rpc('delete_promoter', { p_promoter_id: id });
+    const { data, error } = await supabase.rpc('delete_promoter', { p_promoter_id: id });
+    console.info('[OPERATIONS] RPC delete_promoter.', { data, error });
     if (error) return setNotice(error.message);
+    setPromoters((rows) => rows.filter((promoter) => promoter.id !== id));
     setNotice(''); await refresh();
   }
   async function saveEntry(existing?: ClubEntryCount, requestedCount?: number) {
@@ -91,13 +105,17 @@ export function HostessOperations({ view }: { view: OperationView }) {
     const result = existing
       ? await supabase.rpc('update_club_entry_count', { p_entry_count_id: existing.id, p_count: count })
       : await supabase.rpc('record_club_entry_count', { p_count: count });
-    if (result.error) return setNotice(result.error.message);
+    console.info(existing ? '[OPERATIONS] RPC update_club_entry_count.' : '[OPERATIONS] RPC record_club_entry_count.', result);
+    if (result.error || !result.data) return setNotice(result.error?.message ?? 'Le relevé Entrées club n’a pas été enregistré.');
+    setEntries((rows) => [result.data as ClubEntryCount, ...rows.filter((entry) => entry.id !== result.data.id)].sort((left, right) => new Date(right.recorded_at).getTime() - new Date(left.recorded_at).getTime()));
     setEntryValue(''); setEditingEntry(null); setNotice(''); await refresh();
   }
   async function deleteEntry(id: string) {
     if (!window.confirm('Supprimer ce relevé Entrées club ?')) return;
-    const { error } = await supabase.rpc('delete_club_entry_count', { p_entry_count_id: id });
+    const { data, error } = await supabase.rpc('delete_club_entry_count', { p_entry_count_id: id });
+    console.info('[OPERATIONS] RPC delete_club_entry_count.', { data, error });
     if (error) return setNotice(error.message);
+    setEntries((rows) => rows.filter((entry) => entry.id !== id));
     setNotice(''); await refresh();
   }
 
