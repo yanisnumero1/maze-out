@@ -51,7 +51,7 @@ describe('configuration opérationnelle réelle', () => {
   });
 
   it('fait dépendre le statut LIVE de la capacité maximale de zone', () => {
-    expect(live).toContain('clients >= maxCapacity');
+    expect(live).toContain('zoneAvailabilityStatus');
     expect(live).toContain('zone.max_capacity');
   });
 });

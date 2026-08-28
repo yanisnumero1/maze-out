@@ -35,7 +35,7 @@ describe('numérotation opérationnelle des tables', () => {
 
   it('affiche et trie les tables Hôtesse de manière numérique', () => {
     expect(hostess).toContain(".order('display_number')");
-    expect(hostess).toContain('TABLE {t.display_number}');
+    expect(hostess).toContain('TABLE {table.display_number}');
   });
 
   it('affiche la même numérotation dans Administration', () => {
