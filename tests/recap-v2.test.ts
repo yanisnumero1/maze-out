@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { finalClubEntryCount, promoterTotal, recapRotations, recapTables, selectedNightNotes } from '@/lib/recap';
+import { promoterTotal, recapRotations, recapTables, selectedNightNotes, totalClubEntryCount } from '@/lib/recap';
 import type { ClubEntryCount, FloorNote, Promoter, TableVisit } from '@/lib/types';
 
 const zone = { id: 'z1', name: 'Carré 1', display_order: 1, active: true };
@@ -18,9 +18,12 @@ describe('récapitulatif V2', () => {
     expect(recapRotations(tables).map((table) => table.tableNumber)).toEqual([8, 12]);
   });
 
-  it('utilise le dernier relevé cumulatif sans additionner les relevés', () => {
-    const counts: ClubEntryCount[] = [{ id: 'e1', night_session_id: 'night-a', count: 96, recorded_at: '2026-08-23T22:30:00Z', created_by: null, created_at: '', updated_at: '' }, { id: 'e2', night_session_id: 'night-a', count: 267, recorded_at: '2026-08-23T23:30:00Z', created_by: null, created_at: '', updated_at: '' }];
-    expect(finalClubEntryCount(counts)).toBe(267);
+  it('additionne les relevés Entrées club de la soirée sans les mélanger', () => {
+    const counts: ClubEntryCount[] = [{ id: 'e1', night_session_id: 'night-a', count: 5, recorded_at: '2026-08-23T22:30:00Z', created_by: null, created_at: '', updated_at: '' }, { id: 'e2', night_session_id: 'night-a', count: 5, recorded_at: '2026-08-23T23:30:00Z', created_by: null, created_at: '', updated_at: '' }];
+    expect(totalClubEntryCount(counts)).toBe(10);
+    expect(totalClubEntryCount([...counts.slice(0, 1), { ...counts[1], count: 8 }])).toBe(13);
+    expect(totalClubEntryCount([{ ...counts[1], count: 8 }])).toBe(8);
+    expect(totalClubEntryCount([{ ...counts[0], night_session_id: 'night-b', count: 3 }, { ...counts[1], night_session_id: 'night-b', count: 7 }])).toBe(10);
   });
 
   it('totalise les valeurs finales des promoteurs de la soirée sélectionnée', () => {

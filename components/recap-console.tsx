@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { activitySummary, finalClubEntryCount, promoterTotal, recapRotations, recapTables, recapWaiters, recapZones, selectedNightNotes } from '@/lib/recap';
+import { activitySummary, promoterTotal, recapRotations, recapTables, recapWaiters, recapZones, selectedNightNotes, totalClubEntryCount } from '@/lib/recap';
 import { supabase } from '@/lib/supabase/client';
 import type { ClubEntryCount, FloorNote, LiveTable, NightSession, Promoter, TableVisit } from '@/lib/types';
 
@@ -74,7 +74,7 @@ export function RecapConsole() {
   const rotations = useMemo(() => recapRotations(soldTables), [soldTables]);
   const zones = useMemo(() => recapZones(tables.filter((table) => table.active), visits), [tables, visits]);
   const waiters = useMemo(() => recapWaiters(tables.filter((table) => table.active), visits), [tables, visits]);
-  const finalEntries = useMemo(() => finalClubEntryCount(selectedEntries), [selectedEntries]);
+  const finalEntries = useMemo(() => totalClubEntryCount(selectedEntries), [selectedEntries]);
   const promotersCount = useMemo(() => promoterTotal(selectedPromoters), [selectedPromoters]);
   const selectedTable = soldTables.find((table) => table.tableId === openTableId);
 
@@ -116,7 +116,7 @@ export function RecapConsole() {
       <section className="mt-8"><h2 className="mb-3 text-xl font-bold">TABLES LES PLUS VENDUES</h2><div className="grid gap-2">{rotations.map((table) => <div className="panel flex p-3" key={table.tableId}><span className="mr-auto">Table {table.tableNumber}</span><b>{table.sales} vente{table.sales !== 1 ? 's' : ''}</b></div>)}</div></section>
       <section className="mt-8"><h2 className="mb-3 text-xl font-bold">PAR CARRÉ</h2><div className="grid gap-4 sm:grid-cols-2">{zones.map(({ zone, summary }) => <article className="panel p-5" key={zone.id}><h3 className="text-xl font-black">{zone.name}</h3><p className="mt-4">Tables vendues : {summary.usedTables} / {summary.totalTables}</p><p>Ventes totales : {visits.filter((visit) => visit.zone_id === zone.id).length}</p><p>Personnes accueillies : {summary.clients}</p><p>Invités : {summary.extraGuests}</p></article>)}</div></section>
       <section className="mt-8"><h2 className="mb-3 text-xl font-bold">PAR CHEF DE RANG</h2><div className="grid gap-4 sm:grid-cols-2">{waiters.map(({ waiter, assignedTables, summary }) => <article className="panel p-5" key={waiter.id}><h3 className="text-xl font-black">{fullName(waiter)}</h3><p className="mt-4">Tables différentes vendues : {summary.usedTables} / {assignedTables}</p><p>Ventes totales : {visits.filter((visit) => visit.head_waiter_id === waiter.id).length}</p><p>Personnes accueillies : {summary.clients}</p><p>Invités : {summary.extraGuests}</p></article>)}</div></section>
-      <section className="mt-8 grid gap-6 lg:grid-cols-2"><article><h2 className="mb-3 text-xl font-bold">ENTRÉES CLUB</h2><div className="panel p-5"><p>Total final : <b>{finalEntries} entrées</b></p><div className="mt-4 grid gap-2">{[...selectedEntries].sort((left, right) => new Date(left.recorded_at).getTime() - new Date(right.recorded_at).getTime()).map((entry) => <div className="flex" key={entry.id}><span className="mr-auto text-zinc-400">{formatTime(entry.recorded_at)}</span><b>{entry.count}</b></div>)}</div></div></article><article><h2 className="mb-3 text-xl font-bold">PROMOTEURS</h2><div className="panel p-5"><p>TOTAL PROMOTEURS · <b>{promotersCount} personnes</b></p><div className="mt-4 grid gap-2">{selectedPromoters.map((promoter) => <div className="flex" key={promoter.id}><span className="mr-auto">{promoter.name}</span><b>{promoter.entry_count}</b></div>)}</div></div></article></section>
+      <section className="mt-8 grid gap-6 lg:grid-cols-2"><article><h2 className="mb-3 text-xl font-bold">ENTRÉES CLUB</h2><div className="panel p-5"><p>Total : <b>{finalEntries} entrées</b></p><div className="mt-4 grid gap-2">{[...selectedEntries].sort((left, right) => new Date(left.recorded_at).getTime() - new Date(right.recorded_at).getTime()).map((entry) => <div className="flex" key={entry.id}><span className="mr-auto text-zinc-400">{formatTime(entry.recorded_at)}</span><b>{entry.count}</b></div>)}</div></div></article><article><h2 className="mb-3 text-xl font-bold">PROMOTEURS</h2><div className="panel p-5"><p>TOTAL PROMOTEURS · <b>{promotersCount} personnes</b></p><div className="mt-4 grid gap-2">{selectedPromoters.map((promoter) => <div className="flex" key={promoter.id}><span className="mr-auto">{promoter.name}</span><b>{promoter.entry_count}</b></div>)}</div></div></article></section>
       <section className="mt-8"><h2 className="mb-3 text-xl font-bold">JOURNAL PISTE</h2><div className="grid gap-3">{selectedNotes.map((note) => <article className="panel p-4" key={note.id}><p className="text-sm text-zinc-400">{formatTime(note.created_at)}</p><p className="mt-2">{note.content}</p></article>)}{selectedNotes.length === 0 && <p className="text-sm text-zinc-400">Aucune note Piste pour cette soirée.</p>}</div></section>
     </section>}
   </>;

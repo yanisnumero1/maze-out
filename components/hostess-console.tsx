@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { ArrivalDraft, LiveTable, TableStatus, Zone } from '@/lib/types';
 import { computedStatus, presentTotal, stats, zoneAvailabilityStatus } from '@/lib/live';
 import { supabase } from '@/lib/supabase/client';
@@ -30,6 +30,7 @@ function Counter({ label, value, max, onChange }: { label: string; value: number
 }
 
 export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [tables, setTables] = useState(initialTables);
   const [screen, setScreen] = useState<Screen>('zones');
@@ -128,7 +129,7 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
 
   const openZone = (item: Zone) => { setZone(item); setScreen('columns'); setNotice(''); };
   const backToColumns = () => { setEditing(null); setChangingTable(false); };
-  const backToZones = () => { setEditing(null); setChangingTable(false); setZone(null); setScreen('zones'); setNotice(''); };
+  const backToZones = () => router.push('/' as any);
   const zoneState = zoneAvailabilityStatus(zoneSummary.present, zone?.max_capacity, zoneSummary.available);
   const zoneLabel = zoneState === 'complete' ? 'COMPLET' : zoneState === 'charged' ? 'CHARGÉ' : 'OUVERT';
   const columnGrid = waiters.length === 1 ? 'grid gap-4' : waiters.length === 2 ? 'grid gap-4 md:grid-cols-2' : 'grid gap-4 md:grid-cols-2 xl:grid-cols-3';

@@ -25,13 +25,14 @@ describe('Lot 4 — opérations de soirée', () => {
     expect(operations).toContain('disabled={value === 0}');
   });
 
-  it('conserve chaque relevé cumulatif Entrées club et permet sa correction', () => {
+  it('conserve chaque ajout Entrées club et permet sa correction', () => {
     expect(migration).toContain('create table public.club_entry_counts');
     expect(migration).toContain('recorded_at timestamptz not null default now()');
     expect(migration).toContain('update_club_entry_count');
     expect(migration).toContain('delete_club_entry_count');
     expect(operations).toContain('Enregistrer le relevé');
-    expect(operations).toContain('Le total est inférieur au dernier relevé');
+    expect(operations).toContain('TOTAL ENTRÉES CLUB');
+    expect(operations).toContain('entries.reduce((total, entry) => total + entry.count, 0)');
     expect(operations).toContain('Derniers relevés');
   });
 

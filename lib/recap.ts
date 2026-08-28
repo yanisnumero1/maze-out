@@ -67,6 +67,6 @@ export const recapTables = (visits: TableVisit[], tableNumbers: Map<string, numb
 
 export const recapRotations = (tables: RecapTable[]) => [...tables].sort((left, right) => right.sales - left.sales || Number(left.tableNumber) - Number(right.tableNumber));
 
-export const finalClubEntryCount = (counts: ClubEntryCount[]) => [...counts].sort((left, right) => new Date(right.recorded_at).getTime() - new Date(left.recorded_at).getTime())[0]?.count ?? 0;
+export const totalClubEntryCount = (counts: ClubEntryCount[]) => counts.reduce((total, entry) => total + entry.count, 0);
 export const promoterTotal = (promoters: Promoter[]) => promoters.reduce((total, promoter) => total + promoter.entry_count, 0);
 export const selectedNightNotes = (notes: FloorNote[], nightSessionId: string) => notes.filter((note) => note.night_session_id === nightSessionId).sort((left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime());

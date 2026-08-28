@@ -61,4 +61,9 @@ describe('vue salle Hôtesse en colonnes', () => {
     expect(live).toContain('/hostess?zone=');
     expect(hostess).toContain("searchParams.get('zone')");
   });
+
+  it('retourne à l’accueil Live depuis une vue de carré', () => {
+    expect(hostess).toContain("import { useRouter, useSearchParams } from 'next/navigation'");
+    expect(hostess).toContain("const backToZones = () => router.push('/' as any)");
+  });
 });
