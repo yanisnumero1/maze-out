@@ -10,4 +10,7 @@ export type LiveTable = NightTable & { zone: Zone; head_waiter: HeadWaiter | nul
 export interface NightSession { id: string; started_at: string; ended_at: string | null; created_at: string }
 export interface TableVisit { id: string; night_session_id: string; table_id: string; zone_id: string; head_waiter_id: string | null; present_people: number; extra_guests: number; comment: string | null; arrived_at: string; ended_at: string | null; sale_number?: number | null; zone: Zone; head_waiter: HeadWaiter | null }
 export interface ArrivalDraft { id: string; table_id: string; actor_id: string; present_people: number; extra_guests: number; comment: string | null; status: 'draft' | 'confirmed' | 'cancelled'; confirmed_sale_number: number | null; created_at: string; updated_at: string; confirmed_at: string | null }
+export interface FloorNote { id: string; night_session_id: string; content: string; created_by: string | null; created_at: string; updated_at: string }
+export interface Promoter { id: string; night_session_id: string; name: string; normalized_name: string; entry_count: number; created_by: string | null; created_at: string; updated_at: string }
+export interface ClubEntryCount { id: string; night_session_id: string; count: number; recorded_at: string; created_by: string | null; created_at: string; updated_at: string }
 export interface Thresholds { lightOverloadFrom: number; overloadFrom: number }
