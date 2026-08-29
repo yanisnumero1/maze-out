@@ -18,9 +18,9 @@ describe('recherche rapide de table depuis le Live', () => {
   it('recherche les tables par chef de rang et présente zone, CDR et statut', () => {
     expect(search).toContain('table.head_waiter.first_name');
     expect(search).toContain('table.zone?.name');
-    expect(search).toContain("'ARRIVÉE EN ATTENTE'");
-    expect(search).toContain("'LIBRE'");
-    expect(search).toContain("'OCCUPÉE'");
+    expect(search).toContain("label: 'Arrivée en attente'");
+    expect(search).toContain("label: 'Libre'");
+    expect(search).toContain("label: 'Occupée'");
   });
 
   it('navigue vers une table sans créer de brouillon', () => {
@@ -51,5 +51,23 @@ describe('recherche rapide de table depuis le Live', () => {
     expect(zoneScreen).toContain('<TableSearch tables={tables} drafts={drafts}');
     expect(zoneScreen.indexOf('<TableSearch')).toBeLessThan(zoneScreen.indexOf('<section className="grid gap-4">'));
     expect(hostess).toContain('router.replace(`/hostess?table=${encodeURIComponent(String(table.display_number))}`)');
+  });
+
+  it('affiche une ligne opérationnelle avec priorité au brouillon, capacité réelle et résultats limités', () => {
+    expect(search).toContain('const MAX_RESULTS = 8');
+    expect(search).toContain('const visibleResults = results.slice(0, MAX_RESULTS)');
+    expect(search).toContain('const capacity = table.max_people ?? table.standard_capacity');
+    expect(search).toContain('draft ? draft.present_people + draft.extra_guests : presentTotal(table)');
+    expect(search).toContain("people: `0/${capacity} pers.`");
+    expect(search).toContain("people: `${totalPeople}/${capacity} pers.`");
+    expect(search).toContain("people: `${totalPeople} pers.`");
+  });
+
+  it('reste vide sans saisie, accessible, effaçable et tactile', () => {
+    expect(search).toContain('if (!query) return []');
+    expect(search).toContain('Effacer la recherche');
+    expect(search).toContain('focus:ring-violet-500/30');
+    expect(search).toContain('focus-visible:ring-violet-400');
+    expect(search).toContain('flex-wrap');
   });
 });
