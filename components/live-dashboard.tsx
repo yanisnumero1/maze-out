@@ -3,9 +3,10 @@
 import type { Session } from '@supabase/supabase-js';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { computedStatus, presentTotal, stats, zoneAvailabilityStatus } from '@/lib/live';
+import { stats, zoneAvailabilityStatus } from '@/lib/live';
 import { supabase } from '@/lib/supabase/client';
 import type { ArrivalDraft, LiveTable } from '@/lib/types';
+import { TableSearch } from '@/components/table-search';
 
 const accents = ['border-emerald-500/40', 'border-orange-500/40', 'border-blue-500/40', 'border-violet-500/40'];
 
@@ -29,29 +30,12 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<ArrivalDraft[]>([]);
-  const [tableQuery, setTableQuery] = useState('');
 
   const zones = useMemo(
     () => [...new Map(tables.filter((table) => table.zone).map((table) => [table.zone.id, table.zone])).values()]
       .sort((left, right) => left.display_order - right.display_order),
     [tables],
   );
-  const tableResults = useMemo(() => {
-    const query = tableQuery.trim().toLocaleLowerCase('fr-FR');
-    if (!query) return [];
-    const numericQuery = query.replace(/^table\s*/, '');
-    return tables
-      .filter((table) => {
-        const displayNumber = String(table.display_number ?? '');
-        const waiter = table.head_waiter ? `${table.head_waiter.first_name} ${table.head_waiter.last_name}`.toLocaleLowerCase('fr-FR') : '';
-        return displayNumber.includes(numericQuery) || `table ${displayNumber}`.includes(query) || waiter.includes(query);
-      })
-      .sort((left, right) => {
-        const leftExact = String(left.display_number) === numericQuery ? 0 : 1;
-        const rightExact = String(right.display_number) === numericQuery ? 0 : 1;
-        return leftExact - rightExact || (left.display_number ?? 0) - (right.display_number ?? 0);
-      });
-  }, [tableQuery, tables]);
 
   useEffect(() => {
     let active = true;
@@ -208,20 +192,7 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
         <div className="panel p-6 text-zinc-300">Aucune donnée disponible</div>
       ) : (
         <>
-          <section className="panel mb-5 border border-violet-500/30 bg-zinc-900/70 p-4" aria-label="Recherche de table">
-            <label className="block text-sm font-bold text-zinc-200" htmlFor="table-search">Rechercher une table</label>
-            <input id="table-search" type="search" inputMode="search" autoComplete="off" value={tableQuery} onChange={(event) => setTableQuery(event.target.value)} placeholder="Rechercher une table..." className="mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white outline-none placeholder:text-zinc-500 focus:border-violet-400" />
-            {tableQuery.trim() && <div className="mt-3 grid gap-2">
-              {tableResults.length === 0 ? <p className="rounded-xl bg-zinc-950/70 px-4 py-3 text-sm text-zinc-400">Aucune table trouvée.</p> : tableResults.map((table) => {
-                const draft = drafts.find((item) => item.table_id === table.id);
-                const statusLabel = draft ? 'ARRIVÉE EN ATTENTE' : computedStatus(table) === 'free' ? 'LIBRE' : 'OCCUPÉE';
-                const statusClass = draft ? 'text-orange-300' : computedStatus(table) === 'free' ? 'text-emerald-300' : 'text-fuchsia-200';
-                const waiter = table.head_waiter ? `${table.head_waiter.first_name} ${table.head_waiter.last_name}` : 'CDR non attribué';
-                const people = draft ? draft.present_people + draft.extra_guests : presentTotal(table);
-                return <button type="button" key={table.id} onClick={() => router.push(`/hostess?table=${encodeURIComponent(String(table.display_number))}`)} className="flex w-full items-center gap-3 rounded-xl border border-zinc-700 bg-zinc-950/70 p-3 text-left transition hover:border-violet-400 hover:bg-zinc-900"><div className="min-w-0"><b className="block">TABLE {table.display_number}</b><span className="mt-1 block truncate text-sm text-zinc-400">{table.zone?.name} · {waiter}</span>{people > 0 && <span className="mt-1 block text-xs text-zinc-300">{people} personne{people !== 1 ? 's' : ''}</span>}</div><span className={`ml-auto shrink-0 text-xs font-bold ${statusClass}`}>{statusLabel}</span></button>;
-              })}
-            </div>}
-          </section>
+          <TableSearch tables={tables} drafts={drafts} onSelect={(table) => router.push(`/hostess?table=${encodeURIComponent(String(table.display_number))}`)} />
           {drafts.length > 0 && (
             <section className="panel mb-6 border border-orange-500/30 bg-zinc-900/80 p-4" aria-label="Arrivées en attente">
               <div className="mb-3 flex items-center justify-between gap-3">
