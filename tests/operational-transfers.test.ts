@@ -46,6 +46,16 @@ describe('transferts opérationnels et revue terrain', () => {
     expect(hostess).toContain('presentTotal(table) === 0 && !draft');
   });
 
+  it('utilise la ligne de destination comme sélection tactile avant la confirmation RPC', () => {
+    expect(hostess).toContain('availableTransferTargets.map((table) => <button');
+    expect(hostess).toContain('setTransferTargetId(table.id); setTransferConfirm(true)');
+    expect(hostess).toContain('Transférer la Table {editing.display_number} vers la Table {transferTarget.display_number} ?');
+    expect(hostess).toContain('Annuler');
+    expect(hostess).toContain("transferBusy ? 'Transfert en cours...' : 'Confirmer le transfert'");
+    expect(hostess).toContain('focus-visible:ring-violet-400');
+    expect(hostess).toContain('group-hover:translate-x-0.5');
+  });
+
   it('permet d’effacer temporairement les compteurs sans contourner les limites', () => {
     expect(hostess).toContain("if (value === 0) setInput('')");
     expect(hostess).toContain("onBlur={() => set(input === '' ? 0 : Number(input))}");
