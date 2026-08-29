@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { stats, zoneAvailabilityStatus } from '@/lib/live';
 import { supabase } from '@/lib/supabase/client';
-import type { LiveTable } from '@/lib/types';
+import type { ArrivalDraft, LiveTable } from '@/lib/types';
 
 const accents = ['border-emerald-500/40', 'border-orange-500/40', 'border-blue-500/40', 'border-violet-500/40'];
 
@@ -28,6 +28,7 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
   const [updated, setUpdated] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<ArrivalDraft[]>([]);
 
   const zones = useMemo(
     () => [...new Map(tables.filter((table) => table.zone).map((table) => [table.zone.id, table.zone])).values()]
@@ -37,6 +38,30 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
 
   useEffect(() => {
     let active = true;
+
+    async function loadDrafts() {
+      const { data: nightId, error: nightError } = await supabase.rpc('current_operational_night_session');
+      if (nightError) {
+        console.error('[LIVE] Chargement de la soirée opérationnelle impossible.', nightError);
+        return;
+      }
+      if (!nightId) {
+        if (active) setDrafts([]);
+        return;
+      }
+
+      const { data, error: draftsError } = await supabase
+        .from('arrival_drafts')
+        .select('*')
+        .eq('status', 'draft')
+        .eq('night_session_id', nightId)
+        .order('created_at', { ascending: true });
+      if (draftsError) {
+        console.error('[LIVE] Chargement des brouillons impossible.', draftsError);
+        return;
+      }
+      if (active) setDrafts((data ?? []) as ArrivalDraft[]);
+    }
 
     async function loadForSession(session: Session | null) {
       if (!session) {
@@ -100,6 +125,7 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
         setUpdated(new Date());
         setLoading(false);
       }
+      void loadDrafts();
     }
 
     void supabase.auth.getSession().then(({ data, error: sessionError }) => {
@@ -133,6 +159,9 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
           setUpdated(new Date());
         }
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'arrival_drafts' }, () => {
+        void loadDrafts();
+      })
       .subscribe();
 
     return () => {
@@ -161,8 +190,29 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
       ) : zones.length === 0 ? (
         <div className="panel p-6 text-zinc-300">Aucune donnée disponible</div>
       ) : (
-        <section className="grid gap-4 md:grid-cols-2">
-          {zones.map((zone, index) => {
+        <>
+          {drafts.length > 0 && (
+            <section className="panel mb-6 border border-orange-500/30 bg-zinc-900/80 p-4" aria-label="Arrivées en attente">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 className="text-sm font-black uppercase tracking-[.18em] text-orange-200">Arrivées en attente · {drafts.length}</h2>
+                <span className="h-2 w-2 rounded-full bg-orange-400" aria-hidden="true" />
+              </div>
+              <div className="grid gap-3 lg:grid-cols-2">
+                {drafts.map((draft) => {
+                  const table = tables.find((item) => item.id === draft.table_id);
+                  const waiter = table?.head_waiter ? `${table.head_waiter.first_name} ${table.head_waiter.last_name}` : 'CDR non attribué';
+                  const createdAt = new Date(draft.created_at);
+                  return <article key={draft.id} className="rounded-xl border border-zinc-700 bg-zinc-950/70 p-4">
+                    <div className="flex items-start justify-between gap-3"><div><h3 className="font-black">TABLE {table?.display_number ?? '—'}</h3><p className="mt-1 text-sm text-zinc-400">{table?.zone?.name ?? 'Carré non attribué'} · {waiter}</p></div><button type="button" onClick={() => router.push(`/hostess?draft=${encodeURIComponent(draft.id)}`)} className="rounded-lg bg-violet-600 px-3 py-2 text-sm font-bold text-white hover:bg-violet-500">Voir</button></div>
+                    <p className="mt-3 text-sm text-zinc-200">{draft.present_people} personne{draft.present_people !== 1 ? 's' : ''}{draft.extra_guests > 0 ? ` + ${draft.extra_guests} invité${draft.extra_guests !== 1 ? 's' : ''}` : ''}</p>
+                    <p className="mt-2 text-xs text-orange-200/80">En attente depuis {createdAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
+                  </article>;
+                })}
+              </div>
+            </section>
+          )}
+          <section className="grid gap-4 md:grid-cols-2">
+            {zones.map((zone, index) => {
             const scoped = tables.filter((table) => table.zone_id === zone.id);
             const summary = stats(scoped);
             const state = status(summary.available, summary.present, zone.max_capacity);
@@ -188,8 +238,9 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
                 </div>
               </button>
             );
-          })}
-        </section>
+            })}
+          </section>
+        </>
       )}
     </>
   );

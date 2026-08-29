@@ -42,14 +42,22 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
   const [notice, setNotice] = useState('');
   const [drafts, setDrafts] = useState<ArrivalDraft[]>([]);
   const [actorId, setActorId] = useState('');
+  const [role, setRole] = useState('');
   const [activeSales, setActiveSales] = useState<Record<string, number>>({});
   const [changingTable, setChangingTable] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelConfirmation, setCancelConfirmation] = useState(false);
 
   const zones = useMemo(() => [...new Map(tables.map((table) => [table.zone.id, table.zone])).values()].sort((left, right) => left.display_order - right.display_order), [tables]);
   const inZone = useMemo(() => zone ? tables.filter((table) => table.zone_id === zone.id) : [], [tables, zone]);
   const waiters = useMemo(() => [...new Map(inZone.filter((table) => table.head_waiter).map((table) => [table.head_waiter!.id, table.head_waiter!])).values()], [inZone]);
   const ownDraft = useMemo(() => drafts.find((draft) => draft.actor_id === actorId) ?? null, [actorId, drafts]);
+  const requestedDraft = useMemo(() => {
+    const draftId = searchParams.get('draft');
+    return draftId ? drafts.find((draft) => draft.id === draftId) ?? null : null;
+  }, [drafts, searchParams]);
+  const displayedDraft = requestedDraft ?? ownDraft;
   const zoneSummary = useMemo(() => stats(inZone), [inZone]);
 
   async function refresh() {
@@ -63,6 +71,11 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     if (tableRows) setTables(normalise(tableRows));
     setDrafts((draftRows ?? []) as ArrivalDraft[]);
     setActorId(userData.user?.id ?? '');
+    if (userData.user?.id) {
+      const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', userData.user.id).single();
+      if (profileError) console.error('[HOSTESS] Impossible de charger le rôle utilisateur.', profileError);
+      setRole(profile?.role ?? '');
+    }
     setActiveSales(Object.fromEntries((saleRows ?? []).filter((visit: any) => visit.sale_number).map((visit: any) => [visit.table_id, visit.sale_number])));
   }
 
@@ -99,17 +112,29 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     setEditing(null); setChangingTable(false); setNotice('Brouillon préparé.'); await refresh();
   }
   async function moveDraft(table: LiveTable) {
-    if (!ownDraft) return;
-    const { error } = await supabase.rpc('move_arrival_draft', { p_draft_id: ownDraft.id, p_table_id: table.id });
+    if (!displayedDraft) return;
+    const { error } = await supabase.rpc('move_arrival_draft', { p_draft_id: displayedDraft.id, p_table_id: table.id });
     if (error) return setNotice(error.message);
     setChangingTable(false); setNotice('Brouillon déplacé.'); await refresh();
   }
   async function confirmDraft() {
-    if (!ownDraft || confirming) return;
+    if (!displayedDraft || confirming) return;
     setConfirming(true);
-    const { error } = await supabase.rpc('confirm_arrival_draft', { p_draft_id: ownDraft.id });
+    const { error } = await supabase.rpc('confirm_arrival_draft', { p_draft_id: displayedDraft.id });
     if (error) { setNotice(error.message.includes('occupied') ? 'Cette table vient d’être occupée par un autre utilisateur. Actualisez ou choisissez une autre table.' : error.message); setConfirming(false); await refresh(); return; }
     setNotice('Arrivée confirmée.'); setConfirming(false); await refresh();
+  }
+  async function cancelDraft() {
+    if (!displayedDraft || cancelling) return;
+    setCancelling(true);
+    const { error } = await supabase.rpc('cancel_arrival_draft', { p_draft_id: displayedDraft.id });
+    if (error) { setNotice(error.message); setCancelling(false); return; }
+    const draftTable = tables.find((table) => table.id === displayedDraft.table_id);
+    setCancelConfirmation(false);
+    setCancelling(false);
+    setNotice('Arrivée annulée.');
+    if (draftTable?.zone) { setZone(draftTable.zone); setScreen('columns'); router.replace(`/hostess?zone=${encodeURIComponent(draftTable.zone.id)}`); }
+    await refresh();
   }
   async function releaseTable() {
     if (!editing) return;
@@ -143,9 +168,10 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     return <button disabled={changingTable && !canMove} onClick={() => changingTable ? void moveDraft(table) : openTable(table)} className="group flex min-h-[112px] w-full items-center rounded-2xl border border-violet-500/30 bg-zinc-900 p-4 text-left shadow-lg shadow-black/20 transition hover:border-violet-400/60 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40" key={table.id}><div className="min-w-0"><b className="block text-lg tracking-wide text-white">TABLE {table.display_number}</b><span className="mt-1 block text-sm text-zinc-300">{draft ? `${draft.present_people} personne${draft.present_people !== 1 ? 's' : ''}${draft.extra_guests > 0 ? ` + ${draft.extra_guests} invité${draft.extra_guests !== 1 ? 's' : ''}` : ''}` : `${clients} personne${clients !== 1 ? 's' : ''}`}</span><span className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ring-1 ${style.badge}`}>{style.label}</span>{activeSales[table.id] && <span className="mt-2 block text-xs text-zinc-400">Vente #{activeSales[table.id]}</span>}{draftOwn && <span className="mt-2 block text-xs text-violet-200">À confirmer</span>}</div><span className="ml-auto text-xl text-violet-300/70">›</span></button>;
   };
 
-  if (ownDraft && !changingTable && !editing) {
-    const draftTable = tables.find((table) => table.id === ownDraft.table_id);
-    return <><button onClick={() => { setChangingTable(true); setScreen('columns'); }} className="mb-4 rounded-lg bg-zinc-800 px-4 py-3 text-sm font-bold">← RETOUR</button><section className="panel p-5"><p className="text-sm font-bold uppercase tracking-[.2em] text-violet-300">Brouillon</p><h1 className="mt-1 text-3xl font-black">TABLE {draftTable?.display_number}</h1><p className="mt-5">{ownDraft.present_people} personnes · {ownDraft.extra_guests} invités</p>{ownDraft.comment && <p className="mt-2 text-sm text-zinc-400">{ownDraft.comment}</p>}<p className="mt-6 font-semibold">Confirmer l’installation sur la Table {draftTable?.display_number} ?</p><div className="mt-5 grid gap-3"><button className="rounded-xl bg-zinc-800 p-4 font-bold" onClick={() => { if (draftTable) { setEditing(draftTable); setPresent(ownDraft.present_people); setExtras(ownDraft.extra_guests); setComment(ownDraft.comment ?? ''); } }}>Modifier</button><button className="rounded-xl bg-zinc-800 p-4 font-bold" onClick={() => { setChangingTable(true); setScreen('columns'); }}>Changer de table</button><button disabled={confirming} className="rounded-xl bg-fuchsia-600 p-4 font-bold disabled:cursor-wait disabled:opacity-60" onClick={() => void confirmDraft()}>{confirming ? 'Confirmation...' : 'Confirmer l’arrivée'}</button></div>{notice && <p className="mt-3 text-red-300">{notice}</p>}</section></>;
+  if (displayedDraft && !changingTable && !editing) {
+    const draftTable = tables.find((table) => table.id === displayedDraft.table_id);
+    const canConfirmOrEdit = displayedDraft.actor_id === actorId || role === 'admin';
+    return <><button onClick={() => { setChangingTable(true); setScreen('columns'); router.replace(`/hostess?zone=${encodeURIComponent(draftTable?.zone_id ?? '')}`); }} className="mb-4 rounded-lg bg-zinc-800 px-4 py-3 text-sm font-bold">← RETOUR</button><section className="panel p-5"><p className="text-sm font-bold uppercase tracking-[.2em] text-violet-300">Brouillon</p><h1 className="mt-1 text-3xl font-black">TABLE {draftTable?.display_number}</h1><p className="mt-5">{displayedDraft.present_people} personnes{displayedDraft.extra_guests > 0 ? ` · ${displayedDraft.extra_guests} invités` : ''}</p>{draftTable?.zone && <p className="mt-2 text-sm text-zinc-400">{draftTable.zone.name} · {draftTable.head_waiter ? `${draftTable.head_waiter.first_name} ${draftTable.head_waiter.last_name}` : 'CDR non attribué'}</p>}{displayedDraft.comment && <p className="mt-2 text-sm text-zinc-400">{displayedDraft.comment}</p>}{canConfirmOrEdit ? <><p className="mt-6 font-semibold">Confirmer l’installation sur la Table {draftTable?.display_number} ?</p><div className="mt-5 grid gap-3"><button className="rounded-xl bg-zinc-800 p-4 font-bold" onClick={() => { if (draftTable) { setEditing(draftTable); setPresent(displayedDraft.present_people); setExtras(displayedDraft.extra_guests); setComment(displayedDraft.comment ?? ''); } }}>Modifier</button><button className="rounded-xl bg-zinc-800 p-4 font-bold" onClick={() => { setChangingTable(true); setScreen('columns'); }}>Changer de table</button><button disabled={confirming} className="rounded-xl bg-fuchsia-600 p-4 font-bold disabled:cursor-wait disabled:opacity-60" onClick={() => void confirmDraft()}>{confirming ? 'Confirmation...' : 'Confirmer l’arrivée'}</button></div></> : <p className="mt-6 text-sm text-zinc-400">Ce brouillon est préparé par une autre hôtesse : seule son autrice ou un administrateur peut le modifier ou le confirmer.</p>}{cancelConfirmation ? <div className="mt-5 rounded-xl border border-red-500/40 bg-red-500/10 p-4"><p className="font-bold">Annuler cette arrivée en attente ?</p><p className="mt-1 text-sm text-zinc-300">Le brouillon de la Table {draftTable?.display_number} sera annulé. Aucune arrivée ne sera comptabilisée.</p><div className="mt-4 grid grid-cols-2 gap-3"><button className="rounded-xl bg-zinc-800 p-3 font-bold" onClick={() => setCancelConfirmation(false)}>Retour</button><button disabled={cancelling} className="rounded-xl bg-red-600 p-3 font-bold disabled:opacity-60" onClick={() => void cancelDraft()}>{cancelling ? 'Annulation...' : 'Annuler l’arrivée'}</button></div></div> : <button className="mt-5 w-full rounded-xl border border-red-500/40 bg-red-500/10 p-4 font-bold text-red-200 hover:bg-red-500/20" onClick={() => setCancelConfirmation(true)}>Annuler l’arrivée</button>}{notice && <p className="mt-3 text-red-300">{notice}</p>}</section></>;
   }
 
   if (editing) {
