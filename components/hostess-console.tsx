@@ -71,6 +71,16 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
   }, [drafts, searchParams]);
   const displayedDraft = requestedDraft ?? ownDraft;
   const zoneSummary = useMemo(() => stats(inZone), [inZone]);
+  const visitsByTable = useMemo(() => {
+    const grouped: Record<string, TableVisit[]> = {};
+    for (const visit of tableVisits) {
+      for (const tableId of new Set([visit.table_id, visit.current_table_id].filter(Boolean) as string[])) {
+        (grouped[tableId] ??= []).push(visit);
+      }
+    }
+    Object.values(grouped).forEach((visits) => visits.sort((left, right) => new Date(right.arrived_at).getTime() - new Date(left.arrived_at).getTime()));
+    return grouped;
+  }, [tableVisits]);
 
   async function refresh() {
     const [{ data: tableRows, error: tablesError }, { data: draftRows, error: draftsError }, { data: userData }, { data: nightId, error: nightError }] = await Promise.all([
@@ -186,6 +196,25 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     if (error) return setNotice(error.message);
     setEditing(null); setNotice('Table libérée.'); await refresh();
   }
+  async function startNextSale() {
+    if (!editing) return;
+    const { error } = await supabase.rpc('release_operational_table', { p_table_id: editing.id });
+    if (error) return setNotice(error.message);
+    setEditing({
+      ...editing,
+      occupancy: {
+        table_id: editing.id,
+        present_people: 0,
+        extra_guests: 0,
+        comment: null,
+        arrived_at: null,
+        updated_at: new Date().toISOString(),
+      },
+    });
+    setPresent(0); setExtras(0); setComment(''); setEditingMode(true);
+    setNotice('Vente précédente terminée. Préparez la nouvelle arrivée.');
+    await refresh();
+  }
   async function confirmTransfer() {
     if (!editing || !transferTargetId || transferBusy) return;
     setTransferBusy(true);
@@ -216,7 +245,10 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     const style = draft ? { badge: 'bg-orange-500/15 text-orange-300 ring-orange-400/30', label: 'BROUILLON' } : tableStyles[computedStatus(table)];
     const clients = draft ? draft.present_people + draft.extra_guests : presentTotal(table);
     const canMove = changingTable && table.id !== displayedDraft?.table_id && table.active && presentTotal(table) === 0 && !draft && Boolean(displayedDraft) && displayedDraft!.present_people <= (table.max_people ?? table.standard_capacity) && displayedDraft!.extra_guests <= (table.max_extra_guests ?? 0);
-    return <button disabled={changingTable && !canMove} onClick={() => changingTable ? void moveDraft(table) : openTable(table)} className="group flex min-h-[112px] w-full items-center rounded-2xl border border-violet-500/30 bg-zinc-900 p-4 text-left shadow-lg shadow-black/20 transition hover:border-violet-400/60 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40" key={table.id}><div className="min-w-0"><b className="block text-lg tracking-wide text-white">TABLE {table.display_number}</b><span className="mt-1 block text-sm text-zinc-300">{draft ? `${draft.present_people} personne${draft.present_people !== 1 ? 's' : ''}${draft.extra_guests > 0 ? ` + ${draft.extra_guests} invité${draft.extra_guests !== 1 ? 's' : ''}` : ''}` : `${clients} personne${clients !== 1 ? 's' : ''}`}</span><span className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ring-1 ${style.badge}`}>{style.label}</span>{activeSales[table.id] && <span className="mt-2 block text-xs text-zinc-400">Vente #{activeSales[table.id]}</span>}{draftOwn && <span className="mt-2 block text-xs text-violet-200">À confirmer</span>}</div><span className="ml-auto text-xl text-violet-300/70">›</span></button>;
+    const visitsForCard = visitsByTable[table.id] ?? [];
+    const recentVisits = visitsForCard.slice(0, 2);
+    const formatTime = (value: string) => new Date(value).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    return <button disabled={changingTable && !canMove} onClick={() => changingTable ? void moveDraft(table) : openTable(table)} className="group flex min-h-[148px] w-full items-center rounded-2xl border border-violet-500/30 bg-zinc-900 p-4 text-left shadow-lg shadow-black/20 transition hover:border-violet-400/60 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40" key={table.id}><div className="min-w-0 flex-1"><b className="block text-lg tracking-wide text-white">TABLE {table.display_number}</b><span className="mt-1 block text-sm text-zinc-300">{draft ? `${draft.present_people} personne${draft.present_people !== 1 ? 's' : ''}${draft.extra_guests > 0 ? ` + ${draft.extra_guests} invité${draft.extra_guests !== 1 ? 's' : ''}` : ''}` : `${clients} personne${clients !== 1 ? 's' : ''}`}</span><span className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ring-1 ${style.badge}`}>{style.label}</span>{activeSales[table.id] && <span className="mt-2 block text-xs text-zinc-400">Vente #{activeSales[table.id]}</span>}{draftOwn && <span className="mt-2 block text-xs text-violet-200">À confirmer</span>}<div className="mt-3 border-t border-zinc-800 pt-2 text-xs leading-5 text-zinc-400">{recentVisits.length ? recentVisits.map((visit) => <span className="block truncate" key={visit.id}>Vente #{visit.sale_number ?? '—'} · {formatTime(visit.arrived_at)}{visit.ended_at ? ` → ${formatTime(visit.ended_at)}` : ''} · {visit.ended_at ? 'Terminée' : 'En cours'}</span>) : <span>Aucune vente</span>}{visitsForCard.length > recentVisits.length && <span className="block">+{visitsForCard.length - recentVisits.length} vente{visitsForCard.length - recentVisits.length > 1 ? 's' : ''} précédente{visitsForCard.length - recentVisits.length > 1 ? 's' : ''}</span>}</div></div><span aria-hidden="true" className="ml-3 text-xl text-violet-300/70">›</span></button>;
   };
 
   if (displayedDraft && !changingTable && !editing) {
@@ -231,7 +263,27 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     const visitsForTable = tableVisits.filter((visit) => visit.table_id === editing.id || visit.current_table_id === editing.id);
     const hasPreviousSale = visitsForTable.some((visit) => visit.ended_at);
     const badge = draft ? { label: 'ARRIVÉE EN ATTENTE', className: 'bg-orange-500/15 text-orange-200' } : occupied ? { label: 'OCCUPÉE', className: 'bg-fuchsia-500/15 text-fuchsia-200' } : { label: 'LIBRE', className: 'bg-emerald-500/15 text-emerald-200' };
-    return <><button onClick={backToColumns} className="mb-4 rounded-lg bg-zinc-800 px-4 py-3 text-sm font-bold">← RETOUR</button><section className="panel p-5"><h1 className="text-3xl font-black">TABLE {editing.display_number}</h1><p className="mt-2 text-sm text-zinc-400">{editing.zone.name} · {editing.head_waiter ? `${editing.head_waiter.first_name} ${editing.head_waiter.last_name}` : 'CDR non attribué'}</p><span className={`mt-4 inline-flex rounded-full px-3 py-1 text-xs font-bold ${badge.className}`}>{badge.label}</span>{occupied && <section className="mt-5 rounded-xl bg-zinc-800 p-4"><h2 className="font-bold">Vente actuelle</h2><p className="mt-2 text-sm text-zinc-300">{presentTotal(editing)} personnes · Vente #{activeSales[editing.id] ?? '—'}</p>{editing.occupancy?.comment && <p className="mt-1 text-sm text-zinc-400">{editing.occupancy.comment}</p>}</section>}<section className="mt-6"><h2 className="text-lg font-bold">Historique de la soirée</h2>{visitsForTable.length ? <div className="mt-3 grid gap-3">{visitsForTable.map((visit) => <article className="rounded-xl bg-zinc-800 p-3" key={visit.id}><b>Vente #{visit.sale_number ?? '—'}</b><p className="mt-1 text-sm text-zinc-300">{visit.present_people} personnes{visit.extra_guests ? ` · ${visit.extra_guests} invités` : ''} · {new Date(visit.arrived_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} → {visit.ended_at ? new Date(visit.ended_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'en cours'} · {visit.ended_at ? 'Terminée' : 'En cours'}</p>{visit.comment && <p className="mt-1 text-sm text-zinc-400">{visit.comment}</p>}{transfers.filter((transfer) => transfer.table_visit_id === visit.id).map((transfer) => <p className="mt-2 text-xs text-violet-200" key={transfer.id}>Transfert : Table {tables.find((table) => table.id === transfer.from_table_id)?.display_number} → Table {tables.find((table) => table.id === transfer.to_table_id)?.display_number}</p>)}</article>)}</div> : <p className="mt-2 text-sm text-zinc-400">Aucune vente cette soirée.</p>}</section><div className="mt-6 grid gap-3">{occupied ? <><button className="rounded-xl bg-fuchsia-600 p-4 font-bold" onClick={() => setEditingMode(true)}>Modifier</button><button className="rounded-xl bg-zinc-800 p-4 font-bold" onClick={() => void releaseTable()}>Libérer la table</button><button className="rounded-xl border border-violet-500/40 bg-violet-500/10 p-4 font-bold text-violet-100" onClick={() => { setEditingMode(true); setTransferring(true); }}>Transférer vers une autre table</button></> : <button className="rounded-xl bg-fuchsia-600 p-4 font-bold" onClick={() => setEditingMode(true)}>{hasPreviousSale ? 'Revendre la table' : 'Installer une arrivée'}</button>}</div>{notice && <p className="mt-3 text-red-300">{notice}</p>}</section></>;
+    return <>
+      <button onClick={backToColumns} className="mb-4 rounded-lg bg-zinc-800 px-4 py-3 text-sm font-bold">← RETOUR</button>
+      <section className="panel p-5">
+        <h1 className="text-3xl font-black">TABLE {editing.display_number}</h1>
+        <p className="mt-2 text-sm text-zinc-400">{editing.zone.name} · {editing.head_waiter ? `${editing.head_waiter.first_name} ${editing.head_waiter.last_name}` : 'CDR non attribué'}</p>
+        <span className={`mt-4 inline-flex rounded-full px-3 py-1 text-xs font-bold ${badge.className}`}>{badge.label}</span>
+        {occupied && <section className="mt-5 rounded-xl bg-zinc-800 p-4"><h2 className="font-bold">Vente actuelle</h2><p className="mt-2 text-sm text-zinc-300">{presentTotal(editing)} personnes · Vente #{activeSales[editing.id] ?? '—'}</p>{editing.occupancy?.comment && <p className="mt-1 text-sm text-zinc-400">{editing.occupancy.comment}</p>}</section>}
+        <section className="mt-6">
+          <h2 className="text-lg font-bold">Historique de la soirée</h2>
+          {visitsForTable.length ? <div className="mt-3 grid gap-3">{visitsForTable.map((visit) => <article className="rounded-xl bg-zinc-800 p-3" key={visit.id}><b>Vente #{visit.sale_number ?? '—'}</b><p className="mt-1 text-sm text-zinc-300">{visit.present_people} personnes{visit.extra_guests ? ` · ${visit.extra_guests} invités` : ''} · {new Date(visit.arrived_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} → {visit.ended_at ? new Date(visit.ended_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'en cours'} · {visit.ended_at ? 'Terminée' : 'En cours'}</p>{visit.comment && <p className="mt-1 text-sm text-zinc-400">{visit.comment}</p>}{transfers.filter((transfer) => transfer.table_visit_id === visit.id).map((transfer) => <p className="mt-2 text-xs text-violet-200" key={transfer.id}>Transfert : Table {tables.find((table) => table.id === transfer.from_table_id)?.display_number} → Table {tables.find((table) => table.id === transfer.to_table_id)?.display_number}</p>)}</article>)}</div> : <p className="mt-2 text-sm text-zinc-400">Aucune vente cette soirée.</p>}
+        </section>
+        <div className="mt-6 grid gap-3">
+          {occupied ? <>
+            <button className="rounded-xl bg-fuchsia-600 p-4 font-bold" onClick={() => void startNextSale()}>NOUVELLE VENTE / NOUVELLE ARRIVÉE</button>
+            <button className="rounded-xl bg-zinc-800 p-4 font-bold" onClick={() => setEditingMode(true)}>Modifier</button>
+            <button className="rounded-xl border border-violet-500/40 bg-violet-500/10 p-4 font-bold text-violet-100" onClick={() => { setEditingMode(true); setTransferring(true); }}>Transférer vers une autre table</button>
+          </> : <button className="rounded-xl bg-fuchsia-600 p-4 font-bold" onClick={() => setEditingMode(true)}>{hasPreviousSale ? 'Nouvelle vente / Nouvelle arrivée' : 'Installer une arrivée'}</button>}
+        </div>
+        {notice && <p className="mt-3 text-red-300">{notice}</p>}
+      </section>
+    </>;
   }
 
   if (editing && editingMode) {
