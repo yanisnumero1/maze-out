@@ -3,13 +3,16 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import type { AppRole } from '@/components/auth-gate';
 
 export function Navigation() {
   const router = useRouter();
+  const pathname = usePathname();
   const [role, setRole] = useState<AppRole | null>(null);
+
+  const linkClass = (active: boolean) => `rounded-full px-3 py-2 font-semibold ${active ? 'bg-fuchsia-600 text-white' : 'bg-zinc-800 text-zinc-100'}`;
 
   useEffect(() => {
     let active = true;
@@ -38,10 +41,10 @@ export function Navigation() {
       <Link href="/" className="mr-auto flex items-center">
         <Image src="/bridge-logo.png" alt="BRIDGE — Pont Alexandre III" width={160} height={57} className="h-8 w-32 object-contain" />
       </Link>
-      <Link className="rounded-full bg-zinc-800 px-3 py-2 font-semibold" href="/">Accueil</Link>
-      <Link className="rounded-full bg-fuchsia-600 px-3 py-2 font-semibold" href="/hostess">Hôtesse</Link>
-      {role === 'admin' && <Link className="rounded-full bg-zinc-800 px-3 py-2 font-semibold" href="/admin">Administration</Link>}
-      {role === 'admin' && <Link className="rounded-full bg-zinc-800 px-3 py-2 font-semibold" href={'/recap' as any}>Récapitulatif</Link>}
+      <Link className={linkClass(pathname === '/')} href="/">Accueil</Link>
+      <Link className={linkClass(pathname.startsWith('/hostess'))} href="/hostess">Hôtesse</Link>
+      {role === 'admin' && <Link className={linkClass(pathname.startsWith('/admin'))} href="/admin">Administration</Link>}
+      {role === 'admin' && <Link className={linkClass(pathname.startsWith('/recap'))} href={'/recap' as any}>Récapitulatif</Link>}
       <button className="rounded-full bg-zinc-800 px-3 py-2 font-semibold" onClick={() => void signOut()}>Se déconnecter</button>
     </nav>
   );

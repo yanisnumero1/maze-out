@@ -45,4 +45,19 @@ describe('authentification et navigation', () => {
     expect(navigation).toContain('supabase.auth.signOut()');
     expect(navigation).toContain("router.replace('/login' as any)");
   });
+
+  it('met en évidence exactement l’onglet correspondant au chemin courant', () => {
+    expect(navigation).toContain('usePathname');
+    expect(navigation).toContain("pathname === '/'");
+    expect(navigation).toContain("pathname.startsWith('/hostess')");
+    expect(navigation).toContain("pathname.startsWith('/admin')");
+    expect(navigation).toContain("pathname.startsWith('/recap')");
+    expect(navigation).toContain("active ? 'bg-fuchsia-600 text-white' : 'bg-zinc-800 text-zinc-100'");
+  });
+
+  it('ne traite jamais la déconnexion comme un onglet actif', () => {
+    const signOutButton = navigation.slice(navigation.indexOf('<button'), navigation.indexOf('</button>') + '</button>'.length);
+    expect(signOutButton).not.toContain('linkClass(');
+    expect(signOutButton).toContain('Se déconnecter');
+  });
 });
