@@ -48,6 +48,7 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
   const [confirming, setConfirming] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelConfirmation, setCancelConfirmation] = useState(false);
+  const [handledTableParam, setHandledTableParam] = useState<string | null>(null);
 
   const zones = useMemo(() => [...new Map(tables.map((table) => [table.zone.id, table.zone])).values()].sort((left, right) => left.display_order - right.display_order), [tables]);
   const inZone = useMemo(() => zone ? tables.filter((table) => table.zone_id === zone.id) : [], [tables, zone]);
@@ -91,6 +92,24 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     const requestedZone = zones.find((item) => item.id === zoneId);
     if (requestedZone) { setZone(requestedZone); setScreen('columns'); }
   }, [searchParams, tables.length, zone, zones]);
+
+  useEffect(() => {
+    const tableNumber = searchParams.get('table');
+    if (!tableNumber) { if (handledTableParam) setHandledTableParam(null); return; }
+    if (tables.length === 0 || handledTableParam === tableNumber) return;
+    const requestedTable = tables.find((table) => String(table.display_number) === tableNumber);
+    setHandledTableParam(tableNumber);
+    if (!requestedTable) { setNotice('Table introuvable.'); return; }
+    const draft = drafts.find((item) => item.table_id === requestedTable.id);
+    if (draft) { router.replace(`/hostess?draft=${encodeURIComponent(draft.id)}`); return; }
+    setZone(requestedTable.zone);
+    setScreen('columns');
+    setPresent(clamp(requestedTable.occupancy?.present_people ?? 0, requestedTable.max_people ?? requestedTable.standard_capacity));
+    setExtras(clamp(requestedTable.occupancy?.extra_guests ?? 0, requestedTable.max_extra_guests ?? 0));
+    setComment(requestedTable.occupancy?.comment ?? '');
+    setEditing(requestedTable);
+    setNotice('');
+  }, [drafts, handledTableParam, router, searchParams, tables]);
 
   function openTable(table: LiveTable) {
     const draft = drafts.find((item) => item.table_id === table.id);
