@@ -39,6 +39,7 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
   const [screen, setScreen] = useState<Screen>('zones');
   const [zone, setZone] = useState<Zone | null>(null);
   const [editing, setEditing] = useState<LiveTable | null>(null);
+  const [editingMode, setEditingMode] = useState(false);
   const [present, setPresent] = useState(0);
   const [extras, setExtras] = useState(0);
   const [comment, setComment] = useState('');
@@ -126,8 +127,13 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     setExtras(clamp(requestedTable.occupancy?.extra_guests ?? 0, requestedTable.max_extra_guests ?? 0));
     setComment(requestedTable.occupancy?.comment ?? '');
     setEditing(requestedTable);
+    setEditingMode(false);
     setNotice('');
   }, [drafts, handledTableParam, router, searchParams, tables]);
+
+  useEffect(() => {
+    if (editing && displayedDraft) setEditingMode(true);
+  }, [displayedDraft, editing]);
 
   function openTable(table: LiveTable) {
     const draft = drafts.find((item) => item.table_id === table.id);
@@ -136,6 +142,7 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     const maxPeople = table.max_people ?? table.standard_capacity;
     const maxGuests = table.max_extra_guests ?? 0;
     setEditing(table);
+    setEditingMode(false);
     setPresent(clamp(table.occupancy?.present_people ?? 0, maxPeople));
     setExtras(clamp(table.occupancy?.extra_guests ?? 0, maxGuests));
     setComment(table.occupancy?.comment ?? '');
@@ -197,7 +204,7 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
   }
 
   const openZone = (item: Zone) => { setZone(item); setScreen('columns'); setNotice(''); };
-  const backToColumns = () => { setEditing(null); setChangingTable(false); setTransferring(false); setTransferTargetId(''); setTransferConfirm(false); };
+  const backToColumns = () => { setEditing(null); setEditingMode(false); setChangingTable(false); setTransferring(false); setTransferTargetId(''); setTransferConfirm(false); };
   const backToZones = () => router.push('/' as any);
   const zoneState = zoneAvailabilityStatus(zoneSummary.present, zone?.max_capacity, zoneSummary.available);
   const zoneLabel = zoneState === 'complete' ? 'COMPLET' : zoneState === 'charged' ? 'CHARGÉ' : 'OUVERT';
@@ -218,7 +225,16 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     return <><button onClick={() => { setChangingTable(true); setScreen('columns'); router.replace(`/hostess?zone=${encodeURIComponent(draftTable?.zone_id ?? '')}`); }} className="mb-4 rounded-lg bg-zinc-800 px-4 py-3 text-sm font-bold">← RETOUR</button><section className="panel p-5"><p className="text-sm font-bold uppercase tracking-[.2em] text-violet-300">Brouillon</p><h1 className="mt-1 text-3xl font-black">TABLE {draftTable?.display_number}</h1><p className="mt-5">{displayedDraft.present_people} personnes{displayedDraft.extra_guests > 0 ? ` · ${displayedDraft.extra_guests} invités` : ''}</p>{draftTable?.zone && <p className="mt-2 text-sm text-zinc-400">{draftTable.zone.name} · {draftTable.head_waiter ? `${draftTable.head_waiter.first_name} ${draftTable.head_waiter.last_name}` : 'CDR non attribué'}</p>}{displayedDraft.comment && <p className="mt-2 text-sm text-zinc-400">{displayedDraft.comment}</p>}{canConfirmOrEdit ? <><p className="mt-6 font-semibold">Confirmer l’installation sur la Table {draftTable?.display_number} ?</p><div className="mt-5 grid gap-3"><button className="rounded-xl bg-zinc-800 p-4 font-bold" onClick={() => { if (draftTable) { setEditing(draftTable); setPresent(displayedDraft.present_people); setExtras(displayedDraft.extra_guests); setComment(displayedDraft.comment ?? ''); } }}>Modifier</button><button className="rounded-xl bg-zinc-800 p-4 font-bold" onClick={() => { setChangingTable(true); setScreen('columns'); }}>Changer de table</button><button disabled={confirming} className="rounded-xl bg-fuchsia-600 p-4 font-bold disabled:cursor-wait disabled:opacity-60" onClick={() => void confirmDraft()}>{confirming ? 'Confirmation...' : 'Confirmer l’arrivée'}</button></div></> : <p className="mt-6 text-sm text-zinc-400">Ce brouillon est préparé par une autre hôtesse : seule son autrice ou un administrateur peut le modifier ou le confirmer.</p>}{cancelConfirmation ? <div className="mt-5 rounded-xl border border-red-500/40 bg-red-500/10 p-4"><p className="font-bold">Annuler cette arrivée en attente ?</p><p className="mt-1 text-sm text-zinc-300">Le brouillon de la Table {draftTable?.display_number} sera annulé. Aucune arrivée ne sera comptabilisée.</p><div className="mt-4 grid grid-cols-2 gap-3"><button className="rounded-xl bg-zinc-800 p-3 font-bold" onClick={() => setCancelConfirmation(false)}>Retour</button><button disabled={cancelling} className="rounded-xl bg-red-600 p-3 font-bold disabled:opacity-60" onClick={() => void cancelDraft()}>{cancelling ? 'Annulation...' : 'Annuler l’arrivée'}</button></div></div> : <button className="mt-5 w-full rounded-xl border border-red-500/40 bg-red-500/10 p-4 font-bold text-red-200 hover:bg-red-500/20" onClick={() => setCancelConfirmation(true)}>Annuler l’arrivée</button>}{notice && <p className="mt-3 text-red-300">{notice}</p>}</section></>;
   }
 
-  if (editing) {
+  if (editing && !editingMode) {
+    const occupied = presentTotal(editing) > 0;
+    const draft = drafts.find((item) => item.table_id === editing.id);
+    const visitsForTable = tableVisits.filter((visit) => visit.table_id === editing.id || visit.current_table_id === editing.id);
+    const hasPreviousSale = visitsForTable.some((visit) => visit.ended_at);
+    const badge = draft ? { label: 'ARRIVÉE EN ATTENTE', className: 'bg-orange-500/15 text-orange-200' } : occupied ? { label: 'OCCUPÉE', className: 'bg-fuchsia-500/15 text-fuchsia-200' } : { label: 'LIBRE', className: 'bg-emerald-500/15 text-emerald-200' };
+    return <><button onClick={backToColumns} className="mb-4 rounded-lg bg-zinc-800 px-4 py-3 text-sm font-bold">← RETOUR</button><section className="panel p-5"><h1 className="text-3xl font-black">TABLE {editing.display_number}</h1><p className="mt-2 text-sm text-zinc-400">{editing.zone.name} · {editing.head_waiter ? `${editing.head_waiter.first_name} ${editing.head_waiter.last_name}` : 'CDR non attribué'}</p><span className={`mt-4 inline-flex rounded-full px-3 py-1 text-xs font-bold ${badge.className}`}>{badge.label}</span>{occupied && <section className="mt-5 rounded-xl bg-zinc-800 p-4"><h2 className="font-bold">Vente actuelle</h2><p className="mt-2 text-sm text-zinc-300">{presentTotal(editing)} personnes · Vente #{activeSales[editing.id] ?? '—'}</p>{editing.occupancy?.comment && <p className="mt-1 text-sm text-zinc-400">{editing.occupancy.comment}</p>}</section>}<section className="mt-6"><h2 className="text-lg font-bold">Historique de la soirée</h2>{visitsForTable.length ? <div className="mt-3 grid gap-3">{visitsForTable.map((visit) => <article className="rounded-xl bg-zinc-800 p-3" key={visit.id}><b>Vente #{visit.sale_number ?? '—'}</b><p className="mt-1 text-sm text-zinc-300">{visit.present_people} personnes{visit.extra_guests ? ` · ${visit.extra_guests} invités` : ''} · {new Date(visit.arrived_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} → {visit.ended_at ? new Date(visit.ended_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'en cours'} · {visit.ended_at ? 'Terminée' : 'En cours'}</p>{visit.comment && <p className="mt-1 text-sm text-zinc-400">{visit.comment}</p>}{transfers.filter((transfer) => transfer.table_visit_id === visit.id).map((transfer) => <p className="mt-2 text-xs text-violet-200" key={transfer.id}>Transfert : Table {tables.find((table) => table.id === transfer.from_table_id)?.display_number} → Table {tables.find((table) => table.id === transfer.to_table_id)?.display_number}</p>)}</article>)}</div> : <p className="mt-2 text-sm text-zinc-400">Aucune vente cette soirée.</p>}</section><div className="mt-6 grid gap-3">{occupied ? <><button className="rounded-xl bg-fuchsia-600 p-4 font-bold" onClick={() => setEditingMode(true)}>Modifier</button><button className="rounded-xl bg-zinc-800 p-4 font-bold" onClick={() => void releaseTable()}>Libérer la table</button><button className="rounded-xl border border-violet-500/40 bg-violet-500/10 p-4 font-bold text-violet-100" onClick={() => { setEditingMode(true); setTransferring(true); }}>Transférer vers une autre table</button></> : <button className="rounded-xl bg-fuchsia-600 p-4 font-bold" onClick={() => setEditingMode(true)}>{hasPreviousSale ? 'Revendre la table' : 'Installer une arrivée'}</button>}</div>{notice && <p className="mt-3 text-red-300">{notice}</p>}</section></>;
+  }
+
+  if (editing && editingMode) {
     const maxPeople = editing.max_people ?? editing.standard_capacity;
     const maxGuests = editing.max_extra_guests ?? 0;
     const occupied = presentTotal(editing) > 0;
