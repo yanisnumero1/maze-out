@@ -1,4 +1,4 @@
-import type { LiveTable, TableStatus, Thresholds } from './types';
+import type { ArrivalDraft, LiveTable, TableStatus, Thresholds, Zone } from './types';
 export const defaultThresholds: Thresholds = { lightOverloadFrom: 8, overloadFrom: 10 };
 export const presentTotal = (table: Pick<LiveTable, 'occupancy'>) => (table.occupancy?.present_people ?? 0) + (table.occupancy?.extra_guests ?? 0);
 export function computedStatus(table: Pick<LiveTable, 'active' | 'reservation' | 'occupancy' | 'standard_capacity'>, thresholds = defaultThresholds): TableStatus {
@@ -21,6 +21,34 @@ export function zoneAvailabilityStatus(clients: number, maxCapacity: number | nu
   if (maxCapacity && clients / maxCapacity >= 0.7) return 'charged' as const;
   if (!maxCapacity && availableTables === 0) return 'complete' as const;
   return 'open' as const;
+}
+export type LiveLoadStatus = 'calme' | 'modere' | 'forte_affluence' | 'presque_complet';
+export function liveLoadStatus(fillRate: number): LiveLoadStatus {
+  if (fillRate >= 90) return 'presque_complet';
+  if (fillRate >= 70) return 'forte_affluence';
+  if (fillRate >= 40) return 'modere';
+  return 'calme';
+}
+export function liveZoneDashboard(tables: LiveTable[], zone: Zone) {
+  const scoped = tables.filter((table) => table.zone_id === zone.id);
+  const summary = stats(scoped);
+  const capacity = zone.max_capacity ?? 0;
+  const fillRate = capacity ? Math.round((summary.present / capacity) * 100) : 0;
+  return { ...summary, totalTables: scoped.length, capacity, fillRate, load: liveLoadStatus(fillRate) };
+}
+export function liveDashboard(tables: LiveTable[], zones: Zone[], drafts: ArrivalDraft[]) {
+  const summary = stats(tables);
+  const capacity = zones.reduce((total, zone) => total + (zone.max_capacity ?? 0), 0);
+  const fillRate = capacity ? Math.round((summary.present / capacity) * 100) : 0;
+  const pendingPeople = drafts.reduce((total, draft) => total + draft.present_people + draft.extra_guests, 0);
+  return {
+    ...summary,
+    capacity,
+    fillRate,
+    load: liveLoadStatus(fillRate),
+    activeDraftCount: drafts.length,
+    pendingPeople,
+  };
 }
 export function zoneRecommendations(tables: LiveTable[], partySize: number) { const zones=[...new Map(tables.map(t=>[t.zone.id,t.zone])).values()]; return zones.map(zone=>{const scoped=tables.filter(t=>t.zone_id===zone.id);const s=stats(scoped);const candidates=recommend(scoped,partySize).slice(0,3);return {zone,stats:s,tables:candidates,score:s.available*100+(s.capacity-s.present)*2-s.fillRate-s.overload*30};}).filter(x=>x.tables.length>0).sort((a,b)=>b.score-a.score); }
 export type LiveAlert={level:'critical'|'warning';label:string};
