@@ -22,7 +22,7 @@ describe('Lot 4 — opérations de soirée', () => {
     expect(migration).toContain("raise exception 'Promoter count cannot be negative'");
     expect(migration).toContain('promoter_count_events');
     expect(operations).toContain('TOTAL PROMOTEURS');
-    expect(operations).toContain('disabled={value === 0}');
+    expect(operations).toContain('disabled={current === 0}');
   });
 
   it('conserve chaque ajout Entrées club et permet sa correction', () => {

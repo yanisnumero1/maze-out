@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { ArrivalDraft, LiveTable, TableStatus, Zone } from '@/lib/types';
+import type { ArrivalDraft, LiveTable, TableStatus, TableVisit, TableVisitTransfer, Zone } from '@/lib/types';
 import { computedStatus, presentTotal, stats, zoneAvailabilityStatus } from '@/lib/live';
 import { supabase } from '@/lib/supabase/client';
 import { TableSearch } from '@/components/table-search';
@@ -26,8 +26,10 @@ const normalise = (rows: any[]): LiveTable[] => rows.map((table) => ({
 const clamp = (value: number, max: number) => Math.max(0, Math.min(max, Number.isFinite(value) ? value : 0));
 
 function Counter({ label, value, max, onChange }: { label: string; value: number; max: number; onChange: (value: number) => void }) {
-  const set = (next: number) => onChange(clamp(next, max));
-  return <div className="mt-5 rounded-xl bg-zinc-800 p-3"><div className="flex items-center justify-between gap-4"><span className="font-semibold">{label}</span><span className="text-sm text-zinc-400">{value} / {max}</span></div><div className="mt-3 flex items-center justify-center gap-3"><button disabled={value <= 0} className="h-11 w-11 rounded-lg bg-zinc-700 text-2xl disabled:cursor-not-allowed disabled:opacity-40" onClick={() => set(value - 1)}>−</button><input aria-label={label} type="number" min="0" max={max} inputMode="numeric" className="h-11 w-20 rounded-lg bg-zinc-950 text-center text-xl font-bold outline-none ring-1 ring-zinc-700 focus:ring-violet-400" value={value} onChange={(event) => set(event.target.value === '' ? 0 : Number(event.target.value))} /><button disabled={value >= max} className="h-11 w-11 rounded-lg bg-fuchsia-600 text-2xl disabled:cursor-not-allowed disabled:opacity-40" onClick={() => set(value + 1)}>+</button></div></div>;
+  const [input, setInput] = useState(String(value));
+  useEffect(() => setInput(String(value)), [value]);
+  const set = (next: number) => { const safe = clamp(next, max); setInput(String(safe)); onChange(safe); };
+  return <div className="mt-5 rounded-xl bg-zinc-800 p-3"><div className="flex items-center justify-between gap-4"><span className="font-semibold">{label}</span><span className="text-sm text-zinc-400">{value} / {max}</span></div><div className="mt-3 flex items-center justify-center gap-3"><button disabled={value <= 0} className="h-11 w-11 rounded-lg bg-zinc-700 text-2xl disabled:cursor-not-allowed disabled:opacity-40" onClick={() => set(value - 1)}>−</button><input aria-label={label} type="number" min="0" max={max} inputMode="numeric" className="h-11 w-20 rounded-lg bg-zinc-950 text-center text-xl font-bold outline-none ring-1 ring-zinc-700 focus:ring-violet-400" value={input} onFocus={() => { if (value === 0) setInput(''); }} onChange={(event) => { const next = event.target.value; setInput(next); if (next !== '') onChange(clamp(Number(next), max)); }} onBlur={() => set(input === '' ? 0 : Number(input))} /><button disabled={value >= max} className="h-11 w-11 rounded-lg bg-fuchsia-600 text-2xl disabled:cursor-not-allowed disabled:opacity-40" onClick={() => set(value + 1)}>+</button></div></div>;
 }
 
 export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] }) {
@@ -45,11 +47,18 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
   const [actorId, setActorId] = useState('');
   const [role, setRole] = useState('');
   const [activeSales, setActiveSales] = useState<Record<string, number>>({});
+  const [tableVisits, setTableVisits] = useState<TableVisit[]>([]);
+  const [transfers, setTransfers] = useState<TableVisitTransfer[]>([]);
   const [changingTable, setChangingTable] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelConfirmation, setCancelConfirmation] = useState(false);
   const [handledTableParam, setHandledTableParam] = useState<string | null>(null);
+  const [transferring, setTransferring] = useState(false);
+  const [transferTargetId, setTransferTargetId] = useState('');
+  const [transferQuery, setTransferQuery] = useState('');
+  const [transferConfirm, setTransferConfirm] = useState(false);
+  const [transferBusy, setTransferBusy] = useState(false);
 
   const zones = useMemo(() => [...new Map(tables.map((table) => [table.zone.id, table.zone])).values()].sort((left, right) => left.display_order - right.display_order), [tables]);
   const inZone = useMemo(() => zone ? tables.filter((table) => table.zone_id === zone.id) : [], [tables, zone]);
@@ -63,13 +72,13 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
   const zoneSummary = useMemo(() => stats(inZone), [inZone]);
 
   async function refresh() {
-    const [{ data: tableRows, error: tablesError }, { data: draftRows, error: draftsError }, { data: saleRows, error: salesError }, { data: userData }] = await Promise.all([
+    const [{ data: tableRows, error: tablesError }, { data: draftRows, error: draftsError }, { data: userData }, { data: nightId, error: nightError }] = await Promise.all([
       supabase.from('tables').select('*, zone:zones(*), head_waiter:head_waiters(*), reservation:reservations(*), occupancy:occupancies(*)').eq('active', true).order('display_number'),
       supabase.from('arrival_drafts').select('*').eq('status', 'draft'),
-      supabase.from('table_visits').select('table_id,sale_number').is('ended_at', null),
       supabase.auth.getUser(),
+      supabase.rpc('current_operational_night_session'),
     ]);
-    if (tablesError || draftsError || salesError) console.error('[HOSTESS] Impossible de rafraîchir la vue salle.', { tablesError, draftsError, salesError });
+    if (tablesError || draftsError || nightError) console.error('[HOSTESS] Impossible de rafraîchir la vue salle.', { tablesError, draftsError, nightError });
     if (tableRows) setTables(normalise(tableRows));
     setDrafts((draftRows ?? []) as ArrivalDraft[]);
     setActorId(userData.user?.id ?? '');
@@ -78,12 +87,20 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
       if (profileError) console.error('[HOSTESS] Impossible de charger le rôle utilisateur.', profileError);
       setRole(profile?.role ?? '');
     }
-    setActiveSales(Object.fromEntries((saleRows ?? []).filter((visit: any) => visit.sale_number).map((visit: any) => [visit.table_id, visit.sale_number])));
+    if (!nightId) { setTableVisits([]); setTransfers([]); setActiveSales({}); return; }
+    const [{ data: visitRows, error: visitsError }, { data: transferRows, error: transfersError }] = await Promise.all([
+      supabase.from('table_visits').select('*').eq('night_session_id', nightId).order('arrived_at'),
+      supabase.from('table_visit_transfers').select('*').eq('night_session_id', nightId).order('created_at'),
+    ]);
+    if (visitsError || transfersError) console.error('[HOSTESS] Historique des ventes impossible à charger.', { visitsError, transfersError });
+    const visits = (visitRows ?? []) as TableVisit[];
+    setTableVisits(visits); setTransfers((transferRows ?? []) as TableVisitTransfer[]);
+    setActiveSales(Object.fromEntries(visits.filter((visit) => !visit.ended_at && visit.sale_number).map((visit) => [visit.current_table_id ?? visit.table_id, visit.sale_number!])));
   }
 
   useEffect(() => {
     void refresh();
-    const channel = supabase.channel('hostess-live').on('postgres_changes', { event: '*', schema: 'public', table: 'occupancies' }, () => void refresh()).on('postgres_changes', { event: '*', schema: 'public', table: 'arrival_drafts' }, () => void refresh()).on('postgres_changes', { event: '*', schema: 'public', table: 'table_visits' }, () => void refresh()).subscribe();
+    const channel = supabase.channel('hostess-live').on('postgres_changes', { event: '*', schema: 'public', table: 'occupancies' }, () => void refresh()).on('postgres_changes', { event: '*', schema: 'public', table: 'arrival_drafts' }, () => void refresh()).on('postgres_changes', { event: '*', schema: 'public', table: 'table_visits' }, () => void refresh()).on('postgres_changes', { event: '*', schema: 'public', table: 'table_visit_transfers' }, () => void refresh()).subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, []);
 
@@ -162,6 +179,13 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     if (error) return setNotice(error.message);
     setEditing(null); setNotice('Table libérée.'); await refresh();
   }
+  async function confirmTransfer() {
+    if (!editing || !transferTargetId || transferBusy) return;
+    setTransferBusy(true);
+    const { error } = await supabase.rpc('transfer_operational_table', { p_from_table_id: editing.id, p_to_table_id: transferTargetId });
+    if (error) { setNotice(error.message); setTransferBusy(false); return; }
+    setTransferBusy(false); setTransferConfirm(false); setTransferring(false); setTransferTargetId(''); setEditing(null); setNotice('Table transférée.'); await refresh();
+  }
   async function saveExistingOccupation() {
     if (!editing) return;
     const maxPeople = editing.max_people ?? editing.standard_capacity;
@@ -173,7 +197,7 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
   }
 
   const openZone = (item: Zone) => { setZone(item); setScreen('columns'); setNotice(''); };
-  const backToColumns = () => { setEditing(null); setChangingTable(false); };
+  const backToColumns = () => { setEditing(null); setChangingTable(false); setTransferring(false); setTransferTargetId(''); setTransferConfirm(false); };
   const backToZones = () => router.push('/' as any);
   const zoneState = zoneAvailabilityStatus(zoneSummary.present, zone?.max_capacity, zoneSummary.available);
   const zoneLabel = zoneState === 'complete' ? 'COMPLET' : zoneState === 'charged' ? 'CHARGÉ' : 'OUVERT';
@@ -184,7 +208,7 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     const draftOwn = draft?.actor_id === actorId;
     const style = draft ? { badge: 'bg-orange-500/15 text-orange-300 ring-orange-400/30', label: 'BROUILLON' } : tableStyles[computedStatus(table)];
     const clients = draft ? draft.present_people + draft.extra_guests : presentTotal(table);
-    const canMove = changingTable && computedStatus(table) === 'free' && !draft;
+    const canMove = changingTable && table.id !== displayedDraft?.table_id && table.active && presentTotal(table) === 0 && !draft && Boolean(displayedDraft) && displayedDraft!.present_people <= (table.max_people ?? table.standard_capacity) && displayedDraft!.extra_guests <= (table.max_extra_guests ?? 0);
     return <button disabled={changingTable && !canMove} onClick={() => changingTable ? void moveDraft(table) : openTable(table)} className="group flex min-h-[112px] w-full items-center rounded-2xl border border-violet-500/30 bg-zinc-900 p-4 text-left shadow-lg shadow-black/20 transition hover:border-violet-400/60 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40" key={table.id}><div className="min-w-0"><b className="block text-lg tracking-wide text-white">TABLE {table.display_number}</b><span className="mt-1 block text-sm text-zinc-300">{draft ? `${draft.present_people} personne${draft.present_people !== 1 ? 's' : ''}${draft.extra_guests > 0 ? ` + ${draft.extra_guests} invité${draft.extra_guests !== 1 ? 's' : ''}` : ''}` : `${clients} personne${clients !== 1 ? 's' : ''}`}</span><span className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ring-1 ${style.badge}`}>{style.label}</span>{activeSales[table.id] && <span className="mt-2 block text-xs text-zinc-400">Vente #{activeSales[table.id]}</span>}{draftOwn && <span className="mt-2 block text-xs text-violet-200">À confirmer</span>}</div><span className="ml-auto text-xl text-violet-300/70">›</span></button>;
   };
 
@@ -198,10 +222,14 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     const maxPeople = editing.max_people ?? editing.standard_capacity;
     const maxGuests = editing.max_extra_guests ?? 0;
     const occupied = presentTotal(editing) > 0;
-    return <><button onClick={backToColumns} className="mb-4 rounded-lg bg-zinc-800 px-4 py-3 text-sm font-bold">← RETOUR</button><section className="panel p-5"><h1 className="text-3xl font-black">TABLE {editing.display_number}</h1><Counter label="Personnes" value={present} max={maxPeople} onChange={setPresent} /><Counter label="Invités" value={extras} max={maxGuests} onChange={setExtras} /><div className="mt-5 rounded-xl bg-zinc-800 p-4"><span className="text-sm text-zinc-400">TOTAL</span><b className="ml-3 text-3xl">{present + extras}</b></div><label className="mt-5 block text-sm font-semibold">Commentaire <span className="font-normal text-zinc-400">(facultatif)</span><textarea className="mt-2 w-full rounded-xl bg-zinc-800 p-4" value={comment} onChange={(event) => setComment(event.target.value)} /></label>{occupied ? <><button className="mt-5 w-full rounded-xl bg-fuchsia-600 p-5 text-lg font-black" onClick={() => void saveExistingOccupation()}>ENREGISTRER</button><button className="mt-3 w-full rounded-xl bg-zinc-800 p-4 font-bold" onClick={() => void releaseTable()}>Libérer la table</button></> : <button className="mt-5 w-full rounded-xl bg-fuchsia-600 p-5 text-lg font-black" onClick={() => void prepareArrival()}>Préparer l’arrivée</button>}{notice && <p className="mt-3 text-red-300">{notice}</p>}</section></>;
+    const visitsForTable = tableVisits.filter((visit) => visit.table_id === editing.id || visit.current_table_id === editing.id);
+    const availableTransferTargets = tables.filter((table) => table.id !== editing.id && table.active && presentTotal(table) === 0 && !drafts.some((draft) => draft.table_id === table.id) && present <= (table.max_people ?? table.standard_capacity) && extras <= (table.max_extra_guests ?? 0) && (`${table.display_number} ${table.head_waiter?.first_name ?? ''} ${table.head_waiter?.last_name ?? ''}`.toLowerCase().includes(transferQuery.toLowerCase())));
+    const transferTarget = tables.find((table) => table.id === transferTargetId);
+    const hasPreviousSale = tableVisits.some((visit) => visit.table_id === editing.id && visit.ended_at);
+    return <><button onClick={backToColumns} className="mb-4 rounded-lg bg-zinc-800 px-4 py-3 text-sm font-bold">← RETOUR</button><section className="panel p-5"><h1 className="text-3xl font-black">TABLE {editing.display_number}</h1><Counter label="Personnes" value={present} max={maxPeople} onChange={setPresent} /><Counter label="Invités" value={extras} max={maxGuests} onChange={setExtras} /><div className="mt-5 rounded-xl bg-zinc-800 p-4"><span className="text-sm text-zinc-400">TOTAL</span><b className="ml-3 text-3xl">{present + extras}</b></div><label className="mt-5 block text-sm font-semibold">Commentaire <span className="font-normal text-zinc-400">(facultatif)</span><textarea className="mt-2 w-full rounded-xl bg-zinc-800 p-4" value={comment} onChange={(event) => setComment(event.target.value)} /></label>{occupied ? <><button className="mt-5 w-full rounded-xl bg-fuchsia-600 p-5 text-lg font-black" onClick={() => void saveExistingOccupation()}>ENREGISTRER</button><button className="mt-3 w-full rounded-xl bg-zinc-800 p-4 font-bold" onClick={() => void releaseTable()}>Libérer la table</button><button className="mt-3 w-full rounded-xl border border-violet-500/40 bg-violet-500/10 p-4 font-bold text-violet-100" onClick={() => setTransferring((value) => !value)}>Transférer vers une autre table</button>{transferring && <div className="mt-4 rounded-xl border border-violet-500/30 bg-zinc-950 p-3"><input value={transferQuery} onChange={(event) => setTransferQuery(event.target.value)} placeholder="Rechercher une destination" className="w-full rounded-lg bg-zinc-800 p-3 outline-none ring-1 ring-zinc-700 focus:ring-violet-400" /><div className="mt-3 grid max-h-64 gap-2 overflow-y-auto">{availableTransferTargets.map((table) => <button key={table.id} onClick={() => { setTransferTargetId(table.id); setTransferConfirm(true); }} className="rounded-xl bg-zinc-800 p-3 text-left hover:bg-zinc-700"><b>Table {table.display_number}</b><span className="ml-2 text-sm text-zinc-400">{table.zone.name} · {table.head_waiter ? `${table.head_waiter.first_name} ${table.head_waiter.last_name}` : 'CDR' } · {table.max_people ?? table.standard_capacity} places</span></button>)}{availableTransferTargets.length === 0 && <p className="text-sm text-zinc-400">Aucune destination disponible.</p>}</div></div>}{transferConfirm && transferTarget && <div className="mt-4 rounded-xl border border-orange-500/40 bg-orange-500/10 p-4"><p className="font-bold">Transférer la Table {editing.display_number} vers la Table {transferTarget.display_number} ?</p><p className="mt-1 text-sm text-zinc-300">La même vente est conservée ; aucune rotation ne sera créée.</p><div className="mt-3 flex gap-2"><button className="rounded-lg bg-zinc-800 px-3 py-2 font-bold" onClick={() => setTransferConfirm(false)}>Retour</button><button disabled={transferBusy} className="rounded-lg bg-orange-500 px-3 py-2 font-bold text-zinc-950 disabled:opacity-60" onClick={() => void confirmTransfer()}>{transferBusy ? 'Transfert...' : 'Confirmer le transfert'}</button></div></div>}</> : <button className="mt-5 w-full rounded-xl bg-fuchsia-600 p-5 text-lg font-black" onClick={() => void prepareArrival()}>{hasPreviousSale ? 'Revendre la table' : 'Préparer l’arrivée'}</button>}<section className="mt-7 border-t border-zinc-800 pt-5"><h2 className="text-lg font-bold">Historique de la soirée</h2>{visitsForTable.length ? <div className="mt-3 grid gap-3">{visitsForTable.map((visit) => <article className="rounded-xl bg-zinc-800 p-3" key={visit.id}><b>Vente #{visit.sale_number ?? '—'}</b><p className="mt-1 text-sm text-zinc-300">{visit.present_people} personnes{visit.extra_guests ? ` · ${visit.extra_guests} invités` : ''} · {new Date(visit.arrived_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · {visit.ended_at ? 'Terminée' : 'En cours'}</p>{visit.comment && <p className="mt-1 text-sm text-zinc-400">{visit.comment}</p>}{transfers.filter((transfer) => transfer.table_visit_id === visit.id).map((transfer) => <p className="mt-2 text-xs text-violet-200" key={transfer.id}>Transfert : Table {tables.find((table) => table.id === transfer.from_table_id)?.display_number} → Table {tables.find((table) => table.id === transfer.to_table_id)?.display_number}</p>)}</article>)}</div> : <p className="mt-2 text-sm text-zinc-400">Aucune vente pour cette table pendant la soirée active.</p>}</section>{notice && <p className="mt-3 text-red-300">{notice}</p>}</section></>;
   }
 
   if (screen === 'zones') return <><header className="mb-5"><p className="text-sm uppercase tracking-[.25em] text-fuchsia-400">Arrivées</p><h1 className="text-3xl font-black">HÔTESSE</h1></header><TableSearch tables={tables} drafts={drafts} onSelect={(table) => router.replace(`/hostess?table=${encodeURIComponent(String(table.display_number))}`)} /><section className="grid gap-4">{zones.map((item) => { const summary = stats(tables.filter((table) => table.zone_id === item.id)); return <button className="panel min-h-28 p-6 text-left" onClick={() => openZone(item)} key={item.id}><b className="block text-2xl">{item.name}</b><span className="mt-2 block text-sm text-zinc-400">{summary.available} table{summary.available !== 1 ? 's' : ''} restante{summary.available !== 1 ? 's' : ''}</span></button>; })}</section></>;
 
-  return <><header className="mb-5"><button onClick={backToZones} className="mb-3 rounded-lg bg-zinc-800 px-4 py-3 text-sm font-bold">← RETOUR AUX CARRÉS</button><p className="text-sm uppercase tracking-[.25em] text-fuchsia-400">Arrivées</p><div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2"><h1 className="text-3xl font-black">{zone?.name}</h1><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${zoneState === 'complete' ? 'bg-red-500/15 text-red-300' : zoneState === 'charged' ? 'bg-orange-500/15 text-orange-300' : 'bg-emerald-500/15 text-emerald-300'}`}>{zoneLabel}</span></div><div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-400"><span>Tables utilisées : {zoneSummary.occupied} / {inZone.length}</span><span>Clients présents : {zoneSummary.present}</span>{zone?.max_capacity && <span>Capacité zone : {zoneSummary.present} / {zone.max_capacity}</span>}</div></header>{changingTable && <p className="mb-4 rounded-xl border border-violet-500/30 bg-violet-500/10 p-3 text-sm text-violet-200">Choisissez une table disponible compatible avec ce brouillon.</p>}<section className={columnGrid}>{waiters.map((item) => { const mine = inZone.filter((table) => table.head_waiter_id === item.id); const summary = stats(mine); return <section className="panel min-w-0 p-4" key={item.id}><header className="mb-4 border-b border-zinc-800 pb-3"><h2 className="text-xl font-black">{item.first_name} {item.last_name}</h2><p className="mt-1 text-sm text-zinc-400">{summary.available} / {mine.length} tables disponibles</p></header><div className="grid gap-3">{mine.map(tableCard)}</div></section>; })}</section>{notice && <p className="mt-4 text-sm text-red-300">{notice}</p>}</>;
+  return <><header className="mb-5"><button onClick={backToZones} className="mb-3 rounded-lg bg-zinc-800 px-4 py-3 text-sm font-bold">← RETOUR AUX CARRÉS</button><p className="text-sm uppercase tracking-[.25em] text-fuchsia-400">Arrivées</p><div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2"><h1 className="text-3xl font-black">{zone?.name}</h1><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${zoneState === 'complete' ? 'bg-red-500/15 text-red-300' : zoneState === 'charged' ? 'bg-orange-500/15 text-orange-300' : 'bg-emerald-500/15 text-emerald-300'}`}>{zoneLabel}</span></div><div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-400"><span>Tables utilisées : {zoneSummary.occupied} / {inZone.length}</span><span>Clients présents : {zoneSummary.present}</span>{zone?.max_capacity && <span>Capacité zone : {zoneSummary.present} / {zone.max_capacity}</span>}</div></header><TableSearch tables={tables} drafts={drafts} onSelect={(table) => router.replace(`/hostess?table=${encodeURIComponent(String(table.display_number))}`)} />{changingTable && <p className="mb-4 rounded-xl border border-violet-500/30 bg-violet-500/10 p-3 text-sm text-violet-200">Choisissez une table disponible compatible avec ce brouillon.</p>}<section className={columnGrid}>{waiters.map((item) => { const mine = inZone.filter((table) => table.head_waiter_id === item.id); const summary = stats(mine); return <section className="panel min-w-0 p-4" key={item.id}><header className="mb-4 border-b border-zinc-800 pb-3"><h2 className="text-xl font-black">{item.first_name} {item.last_name}</h2><p className="mt-1 text-sm text-zinc-400">{summary.available} / {mine.length} tables disponibles</p></header><div className="grid gap-3">{mine.map(tableCard)}</div></section>; })}</section>{notice && <p className="mt-4 text-sm text-red-300">{notice}</p>}</>;
 }
