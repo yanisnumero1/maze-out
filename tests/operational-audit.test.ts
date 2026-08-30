@@ -7,6 +7,8 @@ import type { OperationalActorProfile } from '@/lib/types';
 const file = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 const migration = file('supabase/migrations/0021_operational_audit_log.sql');
 const operations = file('components/hostess-operations.tsx');
+const liveDashboard = file('components/live-dashboard.tsx');
+const hostessConsole = file('components/hostess-console.tsx');
 
 const hostess: OperationalActorProfile = { id: 'pauline', first_name: 'Pauline', last_name: null, role: 'hostess' };
 const admin: OperationalActorProfile = { id: 'admin', first_name: 'Yanis', last_name: null, role: 'admin' };
@@ -51,7 +53,7 @@ describe('audit opérationnel', () => {
     expect(migration).toContain("v_role not in ('admin', 'hostess')");
     expect(migration).toContain('a.night_session_id = v_active_night');
     expect(operations).toContain("rpc('get_operational_actor_profiles'");
-    expect(operations).toContain('new Set(audits.map((audit) => audit.actor_id)');
+    expect(operations).toContain('actorIdsForResolution(');
   });
 
   it('formate les auteurs sans hardcoder Pauline ni exposer le rôle technique', () => {
@@ -63,11 +65,32 @@ describe('audit opérationnel', () => {
   });
 
   it('affiche les auteurs dans les historiques Piste, Promoteurs et Entrées club et synchronise le journal', () => {
-    expect(operations).toContain('Par {formatActorLabel(actors.get(note.created_by');
+    expect(operations).toContain('Créé par {formatActorLabel(actors.get(note.created_by');
     expect(operations).toContain('Par {formatActorLabel(actors.get(event.changed_by');
     expect(operations).toContain('Par {formatActorLabel(actors.get(entry.created_by');
     expect(operations).toContain("table: 'operational_audit_log'");
     expect(migration).toContain('alter publication supabase_realtime add table public.operational_audit_log');
+  });
+
+  it('rend réellement des libellés créateur/modificateur, sans exposer un UUID', () => {
+    expect(operations).toContain('Créé par {formatActorLabel');
+    expect(operations).toContain('Modifié par {formatActorLabel');
+    expect(operations).toContain("auditActor('floor_note', note.id, ['floor_note.updated'])");
+    expect(operations).toContain("auditActor('floor_note', note.id, ['floor_note.updated'])");
+    expect(liveDashboard).toContain('Par {formatActorLabel(actors.get(activityActorId(item)');
+    expect(liveDashboard).toContain('Préparé par {formatActorLabel(actors.get(draft.actor_id))}');
+    expect(hostessConsole).toContain("rpc('get_operational_actor_profiles'");
+    expect(hostessConsole).toContain("table: 'operational_audit_log'");
+    expect(hostessConsole).toContain('Installée par {formatActorLabel');
+    expect(hostessConsole).toContain('Préparé par {draftAuthor}');
+  });
+
+  it('résout les auteurs en lot depuis les actions et les champs historiques existants', () => {
+    for (const source of ['notesResult.data', 'promotersResult.data', 'promoterEventsResult.data', 'entriesResult.data']) expect(operations).toContain(source);
+    expect(operations).toContain('actorIdsForResolution');
+    expect(liveDashboard).toContain('actorIdsForResolution');
+    expect(hostessConsole).toContain('actorIdsForResolution');
+    expect(file('lib/actors.ts')).toContain('Auteur inconnu');
   });
 
   it('réinitialise aussi le journal de test et ne backfill aucun auteur historique', () => {

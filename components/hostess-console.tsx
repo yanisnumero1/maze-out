@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { ArrivalDraft, LiveTable, TableStatus, TableVisit, TableVisitTransfer, Zone } from '@/lib/types';
+import type { ArrivalDraft, LiveTable, OperationalActorProfile, OperationalAuditLog, TableStatus, TableVisit, TableVisitTransfer, Zone } from '@/lib/types';
 import { computedStatus, presentTotal, stats, zoneAvailabilityStatus } from '@/lib/live';
+import { actorIdsForResolution, actorProfileMap, formatActorLabel, latestAuditActor } from '@/lib/actors';
 import { supabase } from '@/lib/supabase/client';
 import { TableSearch } from '@/components/table-search';
 
@@ -50,6 +51,8 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
   const [activeSales, setActiveSales] = useState<Record<string, number>>({});
   const [tableVisits, setTableVisits] = useState<TableVisit[]>([]);
   const [transfers, setTransfers] = useState<TableVisitTransfer[]>([]);
+  const [auditRows, setAuditRows] = useState<OperationalAuditLog[]>([]);
+  const [actorProfiles, setActorProfiles] = useState<OperationalActorProfile[]>([]);
   const [changingTable, setChangingTable] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -81,6 +84,8 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     Object.values(grouped).forEach((visits) => visits.sort((left, right) => new Date(right.arrived_at).getTime() - new Date(left.arrived_at).getTime()));
     return grouped;
   }, [tableVisits]);
+  const actors = useMemo(() => actorProfileMap(actorProfiles), [actorProfiles]);
+  const auditActor = (entityType: string, entityId: string, actionTypes?: string[]) => latestAuditActor(auditRows, entityType, entityId, actionTypes);
 
   async function refresh() {
     const [{ data: tableRows, error: tablesError }, { data: draftRows, error: draftsError }, { data: userData }, { data: nightId, error: nightError }] = await Promise.all([
@@ -98,20 +103,26 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
       if (profileError) console.error('[HOSTESS] Impossible de charger le rôle utilisateur.', profileError);
       setRole(profile?.role ?? '');
     }
-    if (!nightId) { setTableVisits([]); setTransfers([]); setActiveSales({}); return; }
-    const [{ data: visitRows, error: visitsError }, { data: transferRows, error: transfersError }] = await Promise.all([
+    if (!nightId) { setTableVisits([]); setTransfers([]); setAuditRows([]); setActorProfiles([]); setActiveSales({}); return; }
+    const [{ data: visitRows, error: visitsError }, { data: transferRows, error: transfersError }, { data: auditData, error: auditError }] = await Promise.all([
       supabase.from('table_visits').select('*').eq('night_session_id', nightId).order('arrived_at'),
       supabase.from('table_visit_transfers').select('*').eq('night_session_id', nightId).order('created_at'),
+      supabase.from('operational_audit_log').select('*').eq('night_session_id', nightId).order('created_at', { ascending: false }),
     ]);
-    if (visitsError || transfersError) console.error('[HOSTESS] Historique des ventes impossible à charger.', { visitsError, transfersError });
+    if (visitsError || transfersError || auditError) console.error('[HOSTESS] Historique des ventes impossible à charger.', { visitsError, transfersError, auditError });
     const visits = (visitRows ?? []) as TableVisit[];
-    setTableVisits(visits); setTransfers((transferRows ?? []) as TableVisitTransfer[]);
+    const loadedTransfers = (transferRows ?? []) as TableVisitTransfer[];
+    const audits = (auditData ?? []) as OperationalAuditLog[];
+    const actorIds = actorIdsForResolution(...audits.map((audit) => audit.actor_id), ...(draftRows ?? []).map((draft: ArrivalDraft) => draft.actor_id), ...loadedTransfers.map((transfer) => transfer.transferred_by));
+    const { data: profiles, error: profilesError } = actorIds.length ? await supabase.rpc('get_operational_actor_profiles', { p_actor_ids: actorIds }) : { data: [], error: null };
+    if (profilesError) console.error('[HOSTESS] Résolution des auteurs impossible.', profilesError);
+    setTableVisits(visits); setTransfers(loadedTransfers); setAuditRows(audits); setActorProfiles((profiles ?? []) as OperationalActorProfile[]);
     setActiveSales(Object.fromEntries(visits.filter((visit) => !visit.ended_at && visit.sale_number).map((visit) => [visit.current_table_id ?? visit.table_id, visit.sale_number!])));
   }
 
   useEffect(() => {
     void refresh();
-    const channel = supabase.channel('hostess-live').on('postgres_changes', { event: '*', schema: 'public', table: 'occupancies' }, () => void refresh()).on('postgres_changes', { event: '*', schema: 'public', table: 'arrival_drafts' }, () => void refresh()).on('postgres_changes', { event: '*', schema: 'public', table: 'table_visits' }, () => void refresh()).on('postgres_changes', { event: '*', schema: 'public', table: 'table_visit_transfers' }, () => void refresh()).subscribe();
+    const channel = supabase.channel('hostess-live').on('postgres_changes', { event: '*', schema: 'public', table: 'occupancies' }, () => void refresh()).on('postgres_changes', { event: '*', schema: 'public', table: 'arrival_drafts' }, () => void refresh()).on('postgres_changes', { event: '*', schema: 'public', table: 'table_visits' }, () => void refresh()).on('postgres_changes', { event: '*', schema: 'public', table: 'table_visit_transfers' }, () => void refresh()).on('postgres_changes', { event: '*', schema: 'public', table: 'operational_audit_log' }, () => void refresh()).subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, []);
 
@@ -248,7 +259,8 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     const visitsForCard = visitsByTable[table.id] ?? [];
     const recentVisits = visitsForCard.slice(0, 2);
     const formatTime = (value: string) => new Date(value).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-    return <button disabled={changingTable && !canMove} onClick={() => changingTable ? void moveDraft(table) : openTable(table)} className="group flex min-h-[148px] w-full items-center rounded-2xl border border-violet-500/30 bg-zinc-900 p-4 text-left shadow-lg shadow-black/20 transition hover:border-violet-400/60 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40" key={table.id}><div className="min-w-0 flex-1"><b className="block text-lg tracking-wide text-white">TABLE {table.display_number}</b><span className="mt-1 block text-sm text-zinc-300">{draft ? `${draft.present_people} personne${draft.present_people !== 1 ? 's' : ''}${draft.extra_guests > 0 ? ` + ${draft.extra_guests} invité${draft.extra_guests !== 1 ? 's' : ''}` : ''}` : `${clients} personne${clients !== 1 ? 's' : ''}`}</span><span className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ring-1 ${style.badge}`}>{style.label}</span>{activeSales[table.id] && <span className="mt-2 block text-xs text-zinc-400">Vente #{activeSales[table.id]}</span>}{draftOwn && <span className="mt-2 block text-xs text-violet-200">À confirmer</span>}<div className="mt-3 border-t border-zinc-800 pt-2 text-xs leading-5 text-zinc-400">{recentVisits.length ? recentVisits.map((visit) => <span className="block truncate" key={visit.id}>Vente #{visit.sale_number ?? '—'} · {formatTime(visit.arrived_at)}{visit.ended_at ? ` → ${formatTime(visit.ended_at)}` : ''} · {visit.ended_at ? 'Terminée' : 'En cours'}</span>) : <span>Aucune vente</span>}{visitsForCard.length > recentVisits.length && <span className="block">+{visitsForCard.length - recentVisits.length} vente{visitsForCard.length - recentVisits.length > 1 ? 's' : ''} précédente{visitsForCard.length - recentVisits.length > 1 ? 's' : ''}</span>}</div></div><span aria-hidden="true" className="ml-3 text-xl text-violet-300/70">›</span></button>;
+    const draftAuthor = draft ? formatActorLabel(actors.get(draft.actor_id)) : null;
+    return <button disabled={changingTable && !canMove} onClick={() => changingTable ? void moveDraft(table) : openTable(table)} className="group flex min-h-[148px] w-full items-center rounded-2xl border border-violet-500/30 bg-zinc-900 p-4 text-left shadow-lg shadow-black/20 transition hover:border-violet-400/60 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40" key={table.id}><div className="min-w-0 flex-1"><b className="block text-lg tracking-wide text-white">TABLE {table.display_number}</b><span className="mt-1 block text-sm text-zinc-300">{draft ? `${draft.present_people} personne${draft.present_people !== 1 ? 's' : ''}${draft.extra_guests > 0 ? ` + ${draft.extra_guests} invité${draft.extra_guests !== 1 ? 's' : ''}` : ''}` : `${clients} personne${clients !== 1 ? 's' : ''}`}</span><span className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ring-1 ${style.badge}`}>{style.label}</span>{draftAuthor && <span className="mt-2 block text-xs text-zinc-500">Préparé par {draftAuthor}</span>}{activeSales[table.id] && <span className="mt-2 block text-xs text-zinc-400">Vente #{activeSales[table.id]}</span>}{draftOwn && <span className="mt-2 block text-xs text-violet-200">À confirmer</span>}<div className="mt-3 border-t border-zinc-800 pt-2 text-xs leading-5 text-zinc-400">{recentVisits.length ? recentVisits.map((visit) => <span className="block truncate" key={visit.id}>Vente #{visit.sale_number ?? '—'} · {formatTime(visit.arrived_at)}{visit.ended_at ? ` → ${formatTime(visit.ended_at)}` : ''} · {visit.ended_at ? 'Terminée' : 'En cours'}</span>) : <span>Aucune vente</span>}{visitsForCard.length > recentVisits.length && <span className="block">+{visitsForCard.length - recentVisits.length} vente{visitsForCard.length - recentVisits.length > 1 ? 's' : ''} précédente{visitsForCard.length - recentVisits.length > 1 ? 's' : ''}</span>}</div></div><span aria-hidden="true" className="ml-3 text-xl text-violet-300/70">›</span></button>;
   };
 
   if (displayedDraft && !changingTable && !editing) {
@@ -262,6 +274,8 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     const draft = drafts.find((item) => item.table_id === editing.id);
     const visitsForTable = tableVisits.filter((visit) => visit.table_id === editing.id || visit.current_table_id === editing.id);
     const hasPreviousSale = visitsForTable.some((visit) => visit.ended_at);
+    const activeVisit = visitsForTable.find((visit) => !visit.ended_at) ?? null;
+    const activeVisitActor = activeVisit ? auditActor('table', activeVisit.current_table_id ?? activeVisit.table_id, ['table.arrival_confirmed']) : null;
     const badge = draft ? { label: 'ARRIVÉE EN ATTENTE', className: 'bg-orange-500/15 text-orange-200' } : occupied ? { label: 'OCCUPÉE', className: 'bg-fuchsia-500/15 text-fuchsia-200' } : { label: 'LIBRE', className: 'bg-emerald-500/15 text-emerald-200' };
     return <>
       <button onClick={backToColumns} className="mb-4 rounded-lg bg-zinc-800 px-4 py-3 text-sm font-bold">← RETOUR</button>
@@ -269,7 +283,7 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
         <h1 className="text-3xl font-black">TABLE {editing.display_number}</h1>
         <p className="mt-2 text-sm text-zinc-400">{editing.zone.name} · {editing.head_waiter ? `${editing.head_waiter.first_name} ${editing.head_waiter.last_name}` : 'CDR non attribué'}</p>
         <span className={`mt-4 inline-flex rounded-full px-3 py-1 text-xs font-bold ${badge.className}`}>{badge.label}</span>
-        {occupied && <section className="mt-5 rounded-xl bg-zinc-800 p-4"><h2 className="font-bold">Vente actuelle</h2><p className="mt-2 text-sm text-zinc-300">{presentTotal(editing)} personnes · Vente #{activeSales[editing.id] ?? '—'}</p>{editing.occupancy?.comment && <p className="mt-1 text-sm text-zinc-400">{editing.occupancy.comment}</p>}</section>}
+        {occupied && <section className="mt-5 rounded-xl bg-zinc-800 p-4"><h2 className="font-bold">Vente actuelle</h2><p className="mt-2 text-sm text-zinc-300">{presentTotal(editing)} personnes · Vente #{activeSales[editing.id] ?? '—'}</p>{activeVisitActor && <p className="mt-1 text-xs text-zinc-500">Installée par {formatActorLabel(actors.get(activeVisitActor))}</p>}{editing.occupancy?.comment && <p className="mt-1 text-sm text-zinc-400">{editing.occupancy.comment}</p>}</section>}
         <section className="mt-6">
           <h2 className="text-lg font-bold">Historique de la soirée</h2>
           {visitsForTable.length ? <div className="mt-3 grid gap-3">{visitsForTable.map((visit) => <article className="rounded-xl bg-zinc-800 p-3" key={visit.id}><b>Vente #{visit.sale_number ?? '—'}</b><p className="mt-1 text-sm text-zinc-300">{visit.present_people} personnes{visit.extra_guests ? ` · ${visit.extra_guests} invités` : ''} · {new Date(visit.arrived_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} → {visit.ended_at ? new Date(visit.ended_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'en cours'} · {visit.ended_at ? 'Terminée' : 'En cours'}</p>{visit.comment && <p className="mt-1 text-sm text-zinc-400">{visit.comment}</p>}{transfers.filter((transfer) => transfer.table_visit_id === visit.id).map((transfer) => <p className="mt-2 text-xs text-violet-200" key={transfer.id}>Transfert : Table {tables.find((table) => table.id === transfer.from_table_id)?.display_number} → Table {tables.find((table) => table.id === transfer.to_table_id)?.display_number}</p>)}</article>)}</div> : <p className="mt-2 text-sm text-zinc-400">Aucune vente cette soirée.</p>}

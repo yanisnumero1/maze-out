@@ -51,13 +51,13 @@ export function liveDashboard(tables: LiveTable[], zones: Zone[], drafts: Arriva
   };
 }
 export type LiveActivityKind = 'sale_started' | 'sale_ended' | 'transfer' | 'draft';
-export type LiveActivity = { id: string; kind: LiveActivityKind; at: string; tableId?: string; fromTableId?: string; toTableId?: string; saleNumber?: number | null; people?: number; };
+export type LiveActivity = { id: string; kind: LiveActivityKind; at: string; entityId?: string; tableId?: string; fromTableId?: string; toTableId?: string; saleNumber?: number | null; people?: number; };
 export function liveActivity(visits: TableVisit[], transfers: TableVisitTransfer[], drafts: ArrivalDraft[], limit = 8): LiveActivity[] {
   const events: LiveActivity[] = [
-    ...visits.map((visit) => ({ id: `sale-started-${visit.id}`, kind: 'sale_started' as const, at: visit.arrived_at, tableId: visit.current_table_id ?? visit.table_id, saleNumber: visit.sale_number, people: visit.present_people + visit.extra_guests })),
-    ...visits.filter((visit) => visit.ended_at).map((visit) => ({ id: `sale-ended-${visit.id}`, kind: 'sale_ended' as const, at: visit.ended_at!, tableId: visit.current_table_id ?? visit.table_id, saleNumber: visit.sale_number, people: visit.present_people + visit.extra_guests })),
-    ...transfers.map((transfer) => ({ id: `transfer-${transfer.id}`, kind: 'transfer' as const, at: transfer.created_at, fromTableId: transfer.from_table_id, toTableId: transfer.to_table_id })),
-    ...drafts.map((draft) => ({ id: `draft-${draft.id}`, kind: 'draft' as const, at: draft.created_at, tableId: draft.table_id, people: draft.present_people + draft.extra_guests })),
+    ...visits.map((visit) => ({ id: `sale-started-${visit.id}`, entityId: visit.id, kind: 'sale_started' as const, at: visit.arrived_at, tableId: visit.current_table_id ?? visit.table_id, saleNumber: visit.sale_number, people: visit.present_people + visit.extra_guests })),
+    ...visits.filter((visit) => visit.ended_at).map((visit) => ({ id: `sale-ended-${visit.id}`, entityId: visit.id, kind: 'sale_ended' as const, at: visit.ended_at!, tableId: visit.current_table_id ?? visit.table_id, saleNumber: visit.sale_number, people: visit.present_people + visit.extra_guests })),
+    ...transfers.map((transfer) => ({ id: `transfer-${transfer.id}`, entityId: transfer.id, kind: 'transfer' as const, at: transfer.created_at, fromTableId: transfer.from_table_id, toTableId: transfer.to_table_id })),
+    ...drafts.map((draft) => ({ id: `draft-${draft.id}`, entityId: draft.id, kind: 'draft' as const, at: draft.created_at, tableId: draft.table_id, people: draft.present_people + draft.extra_guests })),
   ];
   return events.sort((left, right) => new Date(right.at).getTime() - new Date(left.at).getTime()).slice(0, limit);
 }

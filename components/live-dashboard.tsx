@@ -4,8 +4,9 @@ import type { Session } from '@supabase/supabase-js';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { liveActivity, liveDashboard, liveDashboardAlerts, liveZoneDashboard, recentArrivalsByZone, zoneAvailabilityStatus } from '@/lib/live';
+import { actorIdsForResolution, actorProfileMap, formatActorLabel, latestAuditActor } from '@/lib/actors';
 import { supabase } from '@/lib/supabase/client';
-import type { ArrivalDraft, LiveTable, TableVisit, TableVisitTransfer, Zone } from '@/lib/types';
+import type { ArrivalDraft, LiveTable, OperationalActorProfile, OperationalAuditLog, TableVisit, TableVisitTransfer, Zone } from '@/lib/types';
 
 type ActivityFilter = 'all' | 'sales' | 'transfers' | 'drafts';
 type ConnectionState = 'live' | 'reconnecting' | 'offline';
@@ -47,6 +48,8 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
   const [drafts, setDrafts] = useState<ArrivalDraft[]>([]);
   const [visits, setVisits] = useState<TableVisit[]>([]);
   const [transfers, setTransfers] = useState<TableVisitTransfer[]>([]);
+  const [auditRows, setAuditRows] = useState<OperationalAuditLog[]>([]);
+  const [actorProfiles, setActorProfiles] = useState<OperationalActorProfile[]>([]);
   const [activeNightId, setActiveNightId] = useState<string | null>(null);
   const [nightStartedAt, setNightStartedAt] = useState<string | null>(null);
   const [connection, setConnection] = useState<ConnectionState>('reconnecting');
@@ -58,6 +61,7 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
   const recentByZone = useMemo(() => recentArrivalsByZone(tables, visits, new Date((now ?? new Date()).getTime() - 30 * 60000)), [now, tables, visits]);
   const alerts = useMemo(() => liveDashboardAlerts(tables, zones, drafts, transfers, now ?? new Date()), [drafts, now, tables, transfers, zones]);
   const activities = useMemo(() => liveActivity(visits, transfers, drafts), [drafts, transfers, visits]);
+  const actors = useMemo(() => actorProfileMap(actorProfiles), [actorProfiles]);
   const visibleActivities = activities.filter((item) => activityFilter === 'all' || (activityFilter === 'sales' && item.kind.startsWith('sale_')) || (activityFilter === 'transfers' && item.kind === 'transfer') || (activityFilter === 'drafts' && item.kind === 'draft'));
 
   useEffect(() => {
@@ -81,20 +85,29 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
       if (startedAtError) console.error('[LIVE] Heure de début de soirée indisponible.', startedAtError);
       if (!startedAt) {
         currentNightId = null;
-        if (active) { setActiveNightId(null); setNightStartedAt(null); setDrafts([]); setVisits([]); setTransfers([]); }
+        if (active) { setActiveNightId(null); setNightStartedAt(null); setDrafts([]); setVisits([]); setTransfers([]); setAuditRows([]); setActorProfiles([]); }
         return;
       }
       if (active) setNightStartedAt(startedAt);
-      const [{ data: draftRows, error: draftsError }, { data: visitRows, error: visitsError }, { data: transferRows, error: transfersError }] = await Promise.all([
+      const [{ data: draftRows, error: draftsError }, { data: visitRows, error: visitsError }, { data: transferRows, error: transfersError }, { data: auditData, error: auditError }] = await Promise.all([
         supabase.from('arrival_drafts').select('*').eq('status', 'draft').eq('night_session_id', nightId).order('created_at', { ascending: true }),
         supabase.from('table_visits').select('*').eq('night_session_id', nightId).order('arrived_at', { ascending: false }),
         supabase.from('table_visit_transfers').select('*').eq('night_session_id', nightId).order('created_at', { ascending: false }),
+        supabase.from('operational_audit_log').select('*').eq('night_session_id', nightId).order('created_at', { ascending: false }),
       ]);
-      if (draftsError || visitsError || transfersError) console.error('[LIVE] Chargement activité de soirée impossible.', { draftsError, visitsError, transfersError });
+      if (draftsError || visitsError || transfersError || auditError) console.error('[LIVE] Chargement activité de soirée impossible.', { draftsError, visitsError, transfersError, auditError });
+      const loadedDrafts = (draftRows ?? []) as ArrivalDraft[];
+      const loadedTransfers = (transferRows ?? []) as TableVisitTransfer[];
+      const audits = (auditData ?? []) as OperationalAuditLog[];
+      const actorIds = actorIdsForResolution(...audits.map((audit) => audit.actor_id), ...loadedDrafts.map((draft) => draft.actor_id), ...loadedTransfers.map((transfer) => transfer.transferred_by));
+      const { data: profiles, error: profilesError } = actorIds.length ? await supabase.rpc('get_operational_actor_profiles', { p_actor_ids: actorIds }) : { data: [], error: null };
+      if (profilesError) console.error('[LIVE] Résolution des auteurs impossible.', profilesError);
       if (active) {
-        setDrafts((draftRows ?? []) as ArrivalDraft[]);
+        setDrafts(loadedDrafts);
         setVisits((visitRows ?? []) as TableVisit[]);
-        setTransfers((transferRows ?? []) as TableVisitTransfer[]);
+        setTransfers(loadedTransfers);
+        setAuditRows(audits);
+        setActorProfiles((profiles ?? []) as OperationalActorProfile[]);
       }
     }
     async function loadCurrentNight() {
@@ -102,7 +115,7 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
       if (nightError) { console.error('[LIVE] Chargement de la soirée opérationnelle impossible.', nightError); return; }
       if (!nightId) {
         currentNightId = null;
-        if (active) { setActiveNightId(null); setNightStartedAt(null); setDrafts([]); setVisits([]); setTransfers([]); }
+        if (active) { setActiveNightId(null); setNightStartedAt(null); setDrafts([]); setVisits([]); setTransfers([]); setAuditRows([]); setActorProfiles([]); }
         return;
       }
       await loadNightData(nightId);
@@ -148,6 +161,7 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'arrival_drafts' }, () => void loadCurrentNight())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'table_visits' }, () => void loadCurrentNight())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'table_visit_transfers' }, () => void loadCurrentNight())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'operational_audit_log' }, () => void loadCurrentNight())
       .subscribe((status) => {
         if (!active) return;
         if (!window.navigator.onLine) setConnection('offline');
@@ -172,6 +186,15 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
     if (item.kind === 'sale_ended') return `${tableName(item.tableId)} · Vente #${item.saleNumber ?? '—'} terminée`;
     return `${tableName(item.tableId)} · Nouvelle vente #${item.saleNumber ?? '—'} · ${item.people} personnes`;
   }
+  function activityActorId(item: ReturnType<typeof liveActivity>[number]) {
+    if (item.kind === 'draft') return drafts.find((draft) => draft.id === item.entityId)?.actor_id ?? latestAuditActor(auditRows, 'arrival_draft', item.entityId, ['table.arrival_prepared']);
+    if (item.kind === 'transfer') {
+      const transfer = transfers.find((row) => row.id === item.entityId);
+      return transfer?.transferred_by ?? latestAuditActor(auditRows, 'table_visit', transfer?.table_visit_id, ['table.transferred']);
+    }
+    if (item.kind === 'sale_ended') return latestAuditActor(auditRows, 'table', item.tableId, ['table.sale_ended']) ?? latestAuditActor(auditRows, 'table_visit', item.entityId, ['table.sale_ended']);
+    return latestAuditActor(auditRows, 'table', item.tableId, ['table.arrival_confirmed']);
+  }
 
   return <>
     <header className="mb-6 border-b border-zinc-800 pb-5"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-bold uppercase tracking-[.25em] text-fuchsia-400">LIVE · Soirée en cours</p><h1 className="mt-1 text-3xl font-black">Vue en direct</h1><p className="mt-1 text-zinc-400">État actuel des carrés</p></div><div className="min-w-[10rem] text-right"><p className="text-xs font-bold uppercase tracking-[.14em] text-zinc-500">{now ? formatDate(now) : '—'}</p><time className="mt-1 block font-mono text-3xl font-black tabular-nums text-white">{now ? `${formatTime(now)} · LIVE` : '--:--:-- · LIVE'}</time><p className="mt-1 text-xs text-zinc-500">{activeNightId ? nightStartedAt ? `Soirée démarrée à ${formatStartedAt(nightStartedAt)}` : 'Soirée en cours' : 'Aucune soirée active'}</p></div></div></header>
@@ -179,7 +202,7 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
       <div className="mb-5 flex items-center gap-2 text-xs font-bold"><span aria-hidden="true" className={`h-2 w-2 rounded-full ${connection === 'live' ? 'bg-emerald-400' : connection === 'offline' ? 'bg-red-400' : 'bg-orange-400'}`} /><span className={connectionColors[connection]}>{connectionLabels[connection]}</span><span className="text-zinc-600">· Mis à jour {updated.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span></div>
       <section className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Actions rapides"><button type="button" onClick={() => router.push('/hostess')} className="rounded-xl bg-fuchsia-600 px-3 py-3 text-sm font-black text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">Nouvelle arrivée</button><button type="button" onClick={() => router.push('/hostess?view=entrees')} className="rounded-xl bg-zinc-800 px-3 py-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400">Entrées club</button><button type="button" onClick={() => router.push('/hostess?view=piste')} className="rounded-xl bg-zinc-800 px-3 py-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400">Piste</button><button type="button" onClick={() => router.push('/hostess?view=promoteurs')} className="rounded-xl bg-zinc-800 px-3 py-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400">Promoteurs</button></section>
        <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Indicateurs Live"><article className="panel p-4"><p className="text-xs font-black uppercase tracking-[.16em] text-zinc-400">Personnes présentes</p><p className="mt-3 text-3xl font-black">{dashboard.present} <span className="text-lg text-zinc-500">/ {dashboard.capacity}</span></p><p className="mt-1 text-sm text-zinc-400">{dashboard.fillRate} % de remplissage</p><div className="mt-4"><Progress value={dashboard.fillRate} /></div></article><article className="panel p-4"><p className="text-xs font-black uppercase tracking-[.16em] text-zinc-400">Tables occupées</p><p className="mt-3 text-3xl font-black">{dashboard.occupied} <span className="text-lg text-zinc-500">/ {tables.length}</span></p><p className="mt-1 text-sm text-zinc-400">{tables.length ? Math.round((dashboard.occupied / tables.length) * 100) : 0} % · {dashboard.available} tables disponibles</p><div className="mt-4"><Progress value={tables.length ? Math.round((dashboard.occupied / tables.length) * 100) : 0} tone="bg-violet-500" /></div></article><article className="panel border border-orange-500/30 p-4"><p className="text-xs font-black uppercase tracking-[.16em] text-orange-200">Arrivées en attente</p><p className="mt-3 text-3xl font-black">{dashboard.activeDraftCount}</p><p className="mt-1 text-sm text-zinc-400">{dashboard.pendingPeople} personne{dashboard.pendingPeople !== 1 ? 's' : ''} attendue{dashboard.pendingPeople !== 1 ? 's' : ''}</p><p className="mt-4 text-xs font-bold text-orange-200">Non comptées dans les personnes présentes</p></article></section>
-      {drafts.length > 0 && <section className="panel mt-4 border border-orange-500/30 p-4" aria-label="Arrivées en attente"><h2 className="text-sm font-black uppercase tracking-[.16em] text-orange-200">Arrivées en attente · {drafts.length}</h2><div className="mt-3 grid gap-2 sm:grid-cols-2">{drafts.map((draft) => <button type="button" key={draft.id} onClick={() => router.push(`/hostess?draft=${encodeURIComponent(draft.id)}`)} className="flex items-center justify-between rounded-xl bg-zinc-900 px-3 py-2 text-left hover:bg-zinc-800"><span><b className="block">{tableName(draft.table_id)}</b><span className="text-xs text-zinc-400">{draft.present_people + draft.extra_guests} personnes attendues</span></span><span aria-hidden="true" className="text-violet-300">›</span></button>)}</div></section>}
+      {drafts.length > 0 && <section className="panel mt-4 border border-orange-500/30 p-4" aria-label="Arrivées en attente"><h2 className="text-sm font-black uppercase tracking-[.16em] text-orange-200">Arrivées en attente · {drafts.length}</h2><div className="mt-3 grid gap-2 sm:grid-cols-2">{drafts.map((draft) => <button type="button" key={draft.id} onClick={() => router.push(`/hostess?draft=${encodeURIComponent(draft.id)}`)} className="flex items-center justify-between rounded-xl bg-zinc-900 px-3 py-2 text-left hover:bg-zinc-800"><span><b className="block">{tableName(draft.table_id)}</b><span className="text-xs text-zinc-400">{draft.present_people + draft.extra_guests} personnes attendues</span><span className="mt-1 block text-xs text-zinc-500">Préparé par {formatActorLabel(actors.get(draft.actor_id))}</span></span><span aria-hidden="true" className="text-violet-300">›</span></button>)}</div></section>}
        <section className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/5 px-4 py-3"><div><p className="text-xs font-black uppercase tracking-[.16em] text-fuchsia-200">État de la salle</p><p className={`mt-1 text-lg font-black ${loadColors[dashboard.load]}`}>{loadLabels[dashboard.load]}</p></div>{fullestZone && <p className="text-sm text-zinc-400">Zone la plus remplie : <b className="text-zinc-100">{fullestZone.zone.name} · {fullestZone.summary.fillRate} %</b></p>}</section>
       <section className="mt-4 panel p-4" aria-label="À surveiller"><h2 className="text-sm font-black uppercase tracking-[.16em] text-zinc-200">À surveiller</h2>{alerts.length ? <div className="mt-3 grid gap-2">{alerts.map((alert) => <p key={alert.id} className={`rounded-lg px-3 py-2 text-sm ${alert.level === 'critical' ? 'bg-red-500/10 text-red-200' : 'bg-orange-500/10 text-orange-100'}`}>{alert.label}</p>)}</div> : <p className="mt-2 text-sm text-zinc-400">Rien à signaler</p>}</section>
       <section className="mt-6 grid gap-4 md:grid-cols-2" aria-label="État des carrés">{zones.map((zone, index) => {
@@ -189,7 +212,7 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
         const pendingDrafts = drafts.filter((draft) => tables.find((table) => table.id === draft.table_id)?.zone_id === zone.id).length;
         return <button type="button" aria-label={`Ouvrir la vue salle ${zone.name}`} className={`panel min-h-56 w-full border p-5 text-left transition hover:bg-zinc-900/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 ${accents[index % 4]}`} key={zone.id} onClick={() => router.push(`/hostess?zone=${encodeURIComponent(zone.id)}`)}><div className="flex items-start justify-between gap-3"><div><h2 className="text-2xl font-black">{zone.name}</h2><p className={`mt-1 text-xs font-black uppercase tracking-[.14em] ${state.color}`}>{state.label} · {loadLabels[summary.load]}</p></div><span aria-hidden="true" className="text-xl text-violet-300/70">›</span></div><div className="mt-6 flex items-end justify-between gap-4"><p className="text-3xl font-black">{summary.present} <span className="text-lg text-zinc-500">/ {summary.capacity}</span></p><p className="text-sm font-bold text-zinc-300">{summary.fillRate} % rempli</p></div><p className="mt-1 text-sm text-zinc-400">personnes présentes</p><div className="mt-4"><Progress value={summary.fillRate} tone="bg-fuchsia-500" /></div><div className="mt-5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-300"><span><b>{summary.occupied} / {summary.totalTables}</b> tables occupées</span><span><b>{summary.available}</b> disponibles</span></div>{recentByZone[zone.id] > 0 && <p className="mt-3 text-xs text-violet-200">+{recentByZone[zone.id]} personnes accueillies ces 30 dernières min</p>}{pendingDrafts > 0 && <p className="mt-1 text-xs text-orange-200">{pendingDrafts} arrivée{pendingDrafts > 1 ? 's' : ''} en attente</p>}<p className="mt-3 truncate text-xs text-zinc-500">{waiters.join(' · ')}</p></button>;
       })}</section>
-      <section className="panel mt-6 p-4" aria-label="Activité récente"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-sm font-black uppercase tracking-[.16em] text-zinc-200">Activité récente</h2><div className="flex gap-2">{([{ id: 'all', label: 'Tout' }, { id: 'sales', label: 'Ventes' }, { id: 'transfers', label: 'Transferts' }, { id: 'drafts', label: 'Arrivées' }] as const).map((filter) => <button type="button" key={filter.id} onClick={() => setActivityFilter(filter.id)} className={activityFilter === filter.id ? 'rounded-full bg-fuchsia-600 px-3 py-1 text-xs font-bold' : 'rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold'}>{filter.label}</button>)}</div></div><div className="mt-3 grid gap-2">{visibleActivities.length ? visibleActivities.map((item) => <article className="flex gap-3 rounded-xl bg-zinc-900/70 p-3" key={item.id}><time className="shrink-0 font-mono text-sm text-zinc-400">{formatShortTime(item.at)}</time><p className="text-sm text-zinc-200">{activityText(item)}</p></article>) : <p className="text-sm text-zinc-400">Aucune activité pour la soirée active.</p>}</div></section>
+      <section className="panel mt-6 p-4" aria-label="Activité récente"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-sm font-black uppercase tracking-[.16em] text-zinc-200">Activité récente</h2><div className="flex gap-2">{([{ id: 'all', label: 'Tout' }, { id: 'sales', label: 'Ventes' }, { id: 'transfers', label: 'Transferts' }, { id: 'drafts', label: 'Arrivées' }] as const).map((filter) => <button type="button" key={filter.id} onClick={() => setActivityFilter(filter.id)} className={activityFilter === filter.id ? 'rounded-full bg-fuchsia-600 px-3 py-1 text-xs font-bold' : 'rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold'}>{filter.label}</button>)}</div></div><div className="mt-3 grid gap-2">{visibleActivities.length ? visibleActivities.map((item) => <article className="flex gap-3 rounded-xl bg-zinc-900/70 p-3" key={item.id}><time className="shrink-0 font-mono text-sm text-zinc-400">{formatShortTime(item.at)}</time><div><p className="text-sm text-zinc-200">{activityText(item)}</p><p className="mt-1 text-xs text-zinc-500">Par {formatActorLabel(actors.get(activityActorId(item) ?? ''))}</p></div></article>) : <p className="text-sm text-zinc-400">Aucune activité pour la soirée active.</p>}</div></section>
     </>}
   </>;
 }
