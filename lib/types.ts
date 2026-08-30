@@ -13,5 +13,6 @@ export interface TableVisitTransfer { id: string; night_session_id: string; tabl
 export interface ArrivalDraft { id: string; table_id: string; actor_id: string; night_session_id: string | null; present_people: number; extra_guests: number; comment: string | null; status: 'draft' | 'confirmed' | 'cancelled'; confirmed_sale_number: number | null; created_at: string; updated_at: string; confirmed_at: string | null }
 export interface FloorNote { id: string; night_session_id: string; content: string; created_by: string | null; created_at: string; updated_at: string }
 export interface Promoter { id: string; night_session_id: string; name: string; normalized_name: string; entry_count: number; created_by: string | null; created_at: string; updated_at: string }
+export interface PromoterCountEvent { id: string; promoter_id: string; night_session_id: string; previous_count: number; next_count: number; people_added: number | null; note: string | null; changed_by: string | null; created_at: string }
 export interface ClubEntryCount { id: string; night_session_id: string; count: number; recorded_at: string; created_by: string | null; created_at: string; updated_at: string }
 export interface Thresholds { lightOverloadFrom: number; overloadFrom: number }

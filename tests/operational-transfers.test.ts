@@ -60,7 +60,7 @@ describe('transferts opérationnels et revue terrain', () => {
     expect(hostess).toContain("if (value === 0) setInput('')");
     expect(hostess).toContain("onBlur={() => set(input === '' ? 0 : Number(input))}");
     expect(hostess).toContain('clamp(next, max)');
-    expect(operations).toContain("if (current === 0) setInput('')");
-    expect(operations).toContain("input === '' ? 0 : Number(input)");
+    expect(operations).toContain("if (value === '') return ''");
+    expect(operations).toContain("Number(value) > 0 ? Number(value) : null");
   });
 });

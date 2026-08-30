@@ -21,8 +21,9 @@ describe('Lot 4 — opérations de soirée', () => {
     expect(migration).toContain("lower(regexp_replace(btrim(coalesce(p_name, '')), '\\s+', ' ', 'g'))");
     expect(migration).toContain("raise exception 'Promoter count cannot be negative'");
     expect(migration).toContain('promoter_count_events');
-    expect(operations).toContain('TOTAL PROMOTEURS');
-    expect(operations).toContain('disabled={current === 0}');
+    expect(operations).toContain('TOTAL APPORTÉ');
+    expect(operations).toContain('NOUVELLE ARRIVÉE');
+    expect(operations).toContain('add_promoter_activity');
   });
 
   it('conserve chaque ajout Entrées club et permet sa correction', () => {
@@ -69,7 +70,7 @@ describe('Lot 4 — opérations de soirée', () => {
   });
 
   it('trace chaque RPC et met à jour la liste avant le SELECT de confirmation', () => {
-    for (const rpc of ['add_floor_note', 'update_floor_note', 'delete_floor_note', 'add_promoter', 'set_promoter_count', 'delete_promoter', 'record_club_entry_count', 'update_club_entry_count', 'delete_club_entry_count']) {
+    for (const rpc of ['add_floor_note', 'update_floor_note', 'delete_floor_note', 'add_promoter', 'add_promoter_activity', 'update_promoter_activity', 'delete_promoter_activity', 'delete_promoter', 'record_club_entry_count', 'update_club_entry_count', 'delete_club_entry_count']) {
       expect(operations).toContain('RPC ' + rpc);
     }
     expect(operations).toContain('Listes Supabase chargées.');

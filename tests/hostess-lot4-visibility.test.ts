@@ -31,10 +31,10 @@ describe('visibilité Lot 4 pour l’Hôtesse', () => {
   });
 
   it('conserve les opérations partagées par les RPC et les abonnements Realtime', () => {
-    for (const rpc of ['add_floor_note', 'add_promoter', 'record_club_entry_count', 'update_floor_note', 'set_promoter_count', 'update_club_entry_count']) {
+    for (const rpc of ['add_floor_note', 'add_promoter', 'add_promoter_activity', 'update_promoter_activity', 'delete_promoter_activity', 'record_club_entry_count', 'update_floor_note', 'update_club_entry_count']) {
       expect(operations).toContain(rpc);
     }
-    for (const table of ['floor_notes', 'promoters', 'club_entry_counts']) {
+    for (const table of ['floor_notes', 'promoters', 'promoter_count_events', 'club_entry_counts']) {
       expect(operations).toContain("table: '" + table + "'");
     }
   });
