@@ -14,5 +14,7 @@ export interface ArrivalDraft { id: string; table_id: string; actor_id: string; 
 export interface FloorNote { id: string; night_session_id: string; content: string; created_by: string | null; created_at: string; updated_at: string }
 export interface Promoter { id: string; night_session_id: string; name: string; normalized_name: string; entry_count: number; created_by: string | null; created_at: string; updated_at: string }
 export interface PromoterCountEvent { id: string; promoter_id: string; night_session_id: string; previous_count: number; next_count: number; people_added: number | null; note: string | null; changed_by: string | null; created_at: string }
+export interface OperationalActorProfile { id: string; first_name: string | null; last_name: string | null; role: Role }
+export interface OperationalAuditLog { id: string; night_session_id: string; actor_id: string; action_type: string; entity_type: string; entity_id: string | null; created_at: string; before_data: Record<string, unknown> | null; after_data: Record<string, unknown> | null; metadata: Record<string, unknown> | null }
 export interface ClubEntryCount { id: string; night_session_id: string; count: number; recorded_at: string; created_by: string | null; created_at: string; updated_at: string }
 export interface Thresholds { lightOverloadFrom: number; overloadFrom: number }
