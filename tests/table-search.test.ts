@@ -23,9 +23,8 @@ describe('recherche rapide de table depuis le Live', () => {
     expect(search).toContain("label: 'Occupée'");
   });
 
-  it('navigue vers une table sans créer de brouillon', () => {
-    expect(live).toContain('<TableSearch tables={tables} drafts={drafts}');
-    expect(live).toContain('/hostess?table=');
+  it('navigue vers une table depuis la Salle sans créer de brouillon', () => {
+    expect(live).not.toContain("from '@/components/table-search'");
     expect(search).not.toContain('prepare_arrival_draft');
   });
 

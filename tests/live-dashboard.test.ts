@@ -54,8 +54,8 @@ describe('dashboard Live opérationnel', () => {
     expect(dashboardSource).toContain("second: '2-digit'");
   });
 
-  it('conserve la recherche, les cartes cliquables et les abonnements Realtime existants', () => {
-    expect(dashboardSource).toContain('<TableSearch tables={tables} drafts={drafts}');
+  it('conserve les cartes cliquables et les abonnements Realtime existants', () => {
+    expect(dashboardSource).not.toContain("from '@/components/table-search'");
     expect(dashboardSource).toContain('Ouvrir la vue salle');
     expect(dashboardSource).toContain('/hostess?zone=');
     expect(dashboardSource).toContain("table: 'occupancies'");
@@ -88,6 +88,10 @@ describe('dashboard Live opérationnel', () => {
   it('expose les actions rapides, la synchronisation réelle et le nettoyage des listeners', () => {
     expect(dashboardSource).toContain("router.push('/hostess')");
     expect(dashboardSource).toContain("router.push('/hostess?view=entrees')");
+    expect(dashboardSource).toContain("router.push('/hostess?view=piste')");
+    expect(dashboardSource).toContain("router.push('/hostess?view=promoteurs')");
+    expect(dashboardSource).toContain('grid-cols-2 gap-2 sm:grid-cols-4');
+    expect(dashboardSource).not.toContain('focusSearch');
     expect(dashboardSource).toContain("status === 'SUBSCRIBED'");
     expect(dashboardSource).toContain("status === 'CHANNEL_ERROR'");
     expect(dashboardSource).toContain("window.addEventListener('offline'");
