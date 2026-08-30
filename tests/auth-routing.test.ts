@@ -34,7 +34,8 @@ describe('authentification et navigation', () => {
 
   it('n’expose que la navigation admin ou hôtesse', () => {
     expect(navigation).toContain('Accueil');
-    expect(navigation).toContain('Hôtesse');
+    expect(navigation).toContain('Arrivée');
+    expect(navigation).not.toContain('>Hôtesse</Link>');
     expect(navigation).toContain('Administration');
     expect(navigation).toContain("role === 'admin'");
     expect(navigation).toContain('Récapitulatif');

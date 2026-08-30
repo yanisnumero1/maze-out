@@ -42,7 +42,7 @@ export function Navigation() {
         <Image src="/bridge-logo.png" alt="BRIDGE — Pont Alexandre III" width={160} height={57} className="h-8 w-32 object-contain" />
       </Link>
       <Link className={linkClass(pathname === '/')} href="/">Accueil</Link>
-      <Link className={linkClass(pathname.startsWith('/hostess'))} href="/hostess">Hôtesse</Link>
+      <Link className={linkClass(pathname.startsWith('/hostess'))} href="/hostess">Arrivée</Link>
       {role === 'admin' && <Link className={linkClass(pathname.startsWith('/admin'))} href="/admin">Administration</Link>}
       {role === 'admin' && <Link className={linkClass(pathname.startsWith('/recap'))} href={'/recap' as any}>Récapitulatif</Link>}
       <button className="rounded-full bg-zinc-800 px-3 py-2 font-semibold" onClick={() => void signOut()}>Se déconnecter</button>

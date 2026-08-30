@@ -28,6 +28,11 @@ describe('vue salle Hôtesse en colonnes', () => {
     expect(hostess).toContain('← RETOUR AUX CARRÉS');
   });
 
+  it('nomme simplement l’écran opérationnel Arrivée', () => {
+    expect(hostess).toContain('>ARRIVÉE</h1>');
+    expect(hostess).not.toContain('>HÔTESSE</h1>');
+  });
+
   it('présente les indicateurs du carré avec sa capacité réelle', () => {
     expect(hostess).toContain('Tables utilisées : {zoneSummary.occupied} / {inZone.length}');
     expect(hostess).toContain('Capacité zone : {zoneSummary.present} / {zone.max_capacity}');

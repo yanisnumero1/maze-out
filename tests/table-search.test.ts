@@ -40,7 +40,7 @@ describe('recherche rapide de table depuis le Live', () => {
     expect(live).toContain('supabase.auth.getSession()');
     expect(live).toContain("from('profiles')");
     expect(navigation).toContain("role === 'admin'");
-    expect(navigation).toContain('Hôtesse');
+    expect(navigation).toContain('Arrivée');
     expect(navigation).not.toContain('CDR');
   });
 
