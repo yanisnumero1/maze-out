@@ -1,4 +1,4 @@
-import type { ArrivalDraft, LiveTable, TableStatus, Thresholds, Zone } from './types';
+import type { ArrivalDraft, LiveTable, TableStatus, TableVisit, TableVisitTransfer, Thresholds, Zone } from './types';
 export const defaultThresholds: Thresholds = { lightOverloadFrom: 8, overloadFrom: 10 };
 export const presentTotal = (table: Pick<LiveTable, 'occupancy'>) => (table.occupancy?.present_people ?? 0) + (table.occupancy?.extra_guests ?? 0);
 export function computedStatus(table: Pick<LiveTable, 'active' | 'reservation' | 'occupancy' | 'standard_capacity'>, thresholds = defaultThresholds): TableStatus {
@@ -49,6 +49,41 @@ export function liveDashboard(tables: LiveTable[], zones: Zone[], drafts: Arriva
     activeDraftCount: drafts.length,
     pendingPeople,
   };
+}
+export type LiveActivityKind = 'sale_started' | 'sale_ended' | 'transfer' | 'draft';
+export type LiveActivity = { id: string; kind: LiveActivityKind; at: string; tableId?: string; fromTableId?: string; toTableId?: string; saleNumber?: number | null; people?: number; };
+export function liveActivity(visits: TableVisit[], transfers: TableVisitTransfer[], drafts: ArrivalDraft[], limit = 8): LiveActivity[] {
+  const events: LiveActivity[] = [
+    ...visits.map((visit) => ({ id: `sale-started-${visit.id}`, kind: 'sale_started' as const, at: visit.arrived_at, tableId: visit.current_table_id ?? visit.table_id, saleNumber: visit.sale_number, people: visit.present_people + visit.extra_guests })),
+    ...visits.filter((visit) => visit.ended_at).map((visit) => ({ id: `sale-ended-${visit.id}`, kind: 'sale_ended' as const, at: visit.ended_at!, tableId: visit.current_table_id ?? visit.table_id, saleNumber: visit.sale_number, people: visit.present_people + visit.extra_guests })),
+    ...transfers.map((transfer) => ({ id: `transfer-${transfer.id}`, kind: 'transfer' as const, at: transfer.created_at, fromTableId: transfer.from_table_id, toTableId: transfer.to_table_id })),
+    ...drafts.map((draft) => ({ id: `draft-${draft.id}`, kind: 'draft' as const, at: draft.created_at, tableId: draft.table_id, people: draft.present_people + draft.extra_guests })),
+  ];
+  return events.sort((left, right) => new Date(right.at).getTime() - new Date(left.at).getTime()).slice(0, limit);
+}
+export type LiveDashboardAlert = { id: string; label: string; level: 'warning' | 'critical' };
+export function liveDashboardAlerts(tables: LiveTable[], zones: Zone[], drafts: ArrivalDraft[], transfers: TableVisitTransfer[], now = new Date()): LiveDashboardAlert[] {
+  const alerts: LiveDashboardAlert[] = [];
+  for (const zone of zones) {
+    const summary = liveZoneDashboard(tables, zone);
+    if (summary.fillRate >= 90) alerts.push({ id: `capacity-${zone.id}`, label: `${zone.name} à ${summary.fillRate} %`, level: 'critical' });
+    else if (summary.available <= 2) alerts.push({ id: `availability-${zone.id}`, label: `${zone.name} : ${summary.available} table${summary.available !== 1 ? 's' : ''} disponible${summary.available !== 1 ? 's' : ''}`, level: 'warning' });
+  }
+  for (const draft of drafts) {
+    const minutes = Math.floor((now.getTime() - new Date(draft.created_at).getTime()) / 60000);
+    if (minutes >= 10) alerts.push({ id: `draft-${draft.id}`, label: `Arrivée en attente depuis ${minutes} min`, level: 'warning' });
+  }
+  const transferCounts = transfers.reduce<Record<string, number>>((counts, transfer) => ({ ...counts, [transfer.table_visit_id]: (counts[transfer.table_visit_id] ?? 0) + 1 }), {});
+  for (const [visitId, count] of Object.entries(transferCounts)) if (count >= 2) alerts.push({ id: `transfer-${visitId}`, label: `Une vente a été transférée ${count} fois`, level: 'warning' });
+  return alerts.slice(0, 5);
+}
+export function recentArrivalsByZone(tables: LiveTable[], visits: TableVisit[], since: Date) {
+  const zoneByTable = new Map(tables.map((table) => [table.id, table.zone_id]));
+  return visits.filter((visit) => new Date(visit.arrived_at) >= since).reduce<Record<string, number>>((totals, visit) => {
+    const zoneId = zoneByTable.get(visit.current_table_id ?? visit.table_id);
+    if (zoneId) totals[zoneId] = (totals[zoneId] ?? 0) + visit.present_people + visit.extra_guests;
+    return totals;
+  }, {});
 }
 export function zoneRecommendations(tables: LiveTable[], partySize: number) { const zones=[...new Map(tables.map(t=>[t.zone.id,t.zone])).values()]; return zones.map(zone=>{const scoped=tables.filter(t=>t.zone_id===zone.id);const s=stats(scoped);const candidates=recommend(scoped,partySize).slice(0,3);return {zone,stats:s,tables:candidates,score:s.available*100+(s.capacity-s.present)*2-s.fillRate-s.overload*30};}).filter(x=>x.tables.length>0).sort((a,b)=>b.score-a.score); }
 export type LiveAlert={level:'critical'|'warning';label:string};
