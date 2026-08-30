@@ -26,10 +26,7 @@ const percentageWidth = (value: number) => `${Math.max(0, Math.min(100, value))}
 const formatTime = (date: Date) => date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 const formatShortTime = (value: string) => new Date(value).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 const formatDate = (date: Date) => date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).toLocaleUpperCase('fr-FR');
-const formatDuration = (startedAt: string, now: Date) => {
-  const minutes = Math.max(0, Math.floor((now.getTime() - new Date(startedAt).getTime()) / 60000));
-  return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')}`;
-};
+const formatStartedAt = (startedAt: string) => new Date(startedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false });
 
 function Progress({ value, tone = 'bg-fuchsia-500' }: { value: number; tone?: string }) {
   return <div aria-label={`${value} %`} className="h-2 overflow-hidden rounded-full bg-zinc-800"><div className={`h-full rounded-full transition-all duration-500 ${tone}`} style={{ width: percentageWidth(value) }} /></div>;
@@ -73,7 +70,6 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
   useEffect(() => {
     let active = true;
     let currentNightId: string | null = null;
-    let canReadNightSession = false;
     const updateNetworkState = () => setConnection(window.navigator.onLine ? 'reconnecting' : 'offline');
     updateNetworkState();
     window.addEventListener('online', updateNetworkState);
@@ -82,6 +78,14 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
     async function loadNightData(nightId: string) {
       currentNightId = nightId;
       if (active) setActiveNightId(nightId);
+      const { data: startedAt, error: startedAtError } = await supabase.rpc('current_operational_night_started_at');
+      if (startedAtError) console.error('[LIVE] Heure de début de soirée indisponible.', startedAtError);
+      if (!startedAt) {
+        currentNightId = null;
+        if (active) { setActiveNightId(null); setNightStartedAt(null); setDrafts([]); setVisits([]); setTransfers([]); }
+        return;
+      }
+      if (active) setNightStartedAt(startedAt);
       const [{ data: draftRows, error: draftsError }, { data: visitRows, error: visitsError }, { data: transferRows, error: transfersError }] = await Promise.all([
         supabase.from('arrival_drafts').select('*').eq('status', 'draft').eq('night_session_id', nightId).order('created_at', { ascending: true }),
         supabase.from('table_visits').select('*').eq('night_session_id', nightId).order('arrived_at', { ascending: false }),
@@ -92,11 +96,6 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
         setDrafts((draftRows ?? []) as ArrivalDraft[]);
         setVisits((visitRows ?? []) as TableVisit[]);
         setTransfers((transferRows ?? []) as TableVisitTransfer[]);
-      }
-      if (canReadNightSession) {
-        const { data: session, error: sessionError } = await supabase.from('night_sessions').select('started_at').eq('id', nightId).maybeSingle();
-        if (sessionError) console.error('[LIVE] Durée de soirée indisponible.', sessionError);
-        else if (active) setNightStartedAt(session?.started_at ?? null);
       }
     }
     async function loadCurrentNight() {
@@ -121,7 +120,6 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
         if (active) { setError('Impossible de vérifier le profil utilisateur.'); setLoading(false); }
         return;
       }
-      canReadNightSession = profile.role === 'admin';
       const { data, error: tablesError } = await supabase.from('tables').select('*, zone:zones(*), head_waiter:head_waiters(*), reservation:reservations(*), occupancy:occupancies(*)').eq('active', true).order('display_number');
       if (tablesError) {
         console.error('[LIVE] Chargement des tables impossible.', tablesError);
@@ -149,8 +147,8 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
         if (row?.table_id) { setTables((rows) => rows.map((table) => table.id === row.table_id ? { ...table, reservation: row } : table)); setUpdated(new Date()); }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'arrival_drafts' }, () => void loadCurrentNight())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'table_visits' }, () => currentNightId && void loadNightData(currentNightId))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'table_visit_transfers' }, () => currentNightId && void loadNightData(currentNightId))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'table_visits' }, () => void loadCurrentNight())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'table_visit_transfers' }, () => void loadCurrentNight())
       .subscribe((status) => {
         if (!active) return;
         if (!window.navigator.onLine) setConnection('offline');
@@ -181,7 +179,7 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
   }
 
   return <>
-    <header className="mb-6 border-b border-zinc-800 pb-5"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-bold uppercase tracking-[.25em] text-fuchsia-400">LIVE · Soirée en cours</p><h1 className="mt-1 text-3xl font-black">Vue en direct</h1><p className="mt-1 text-zinc-400">État actuel des carrés</p></div><div className="min-w-[10rem] text-right"><p className="text-xs font-bold uppercase tracking-[.14em] text-zinc-500">{now ? formatDate(now) : '—'}</p><time className="mt-1 block font-mono text-3xl font-black tabular-nums text-white">{now ? formatTime(now) : '--:--:--'}</time><p className="mt-1 text-xs text-zinc-500">{activeNightId ? nightStartedAt && now ? `Soirée en cours depuis ${formatDuration(nightStartedAt, now)}` : 'Soirée en cours' : 'Aucune soirée active'}</p></div></div></header>
+    <header className="mb-6 border-b border-zinc-800 pb-5"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-bold uppercase tracking-[.25em] text-fuchsia-400">LIVE · Soirée en cours</p><h1 className="mt-1 text-3xl font-black">Vue en direct</h1><p className="mt-1 text-zinc-400">État actuel des carrés</p></div><div className="min-w-[10rem] text-right"><p className="text-xs font-bold uppercase tracking-[.14em] text-zinc-500">{now ? formatDate(now) : '—'}</p><time className="mt-1 block font-mono text-3xl font-black tabular-nums text-white">{now ? `${formatTime(now)} · LIVE` : '--:--:-- · LIVE'}</time><p className="mt-1 text-xs text-zinc-500">{activeNightId ? nightStartedAt ? `Soirée démarrée à ${formatStartedAt(nightStartedAt)}` : 'Soirée en cours' : 'Aucune soirée active'}</p></div></div></header>
     {loading ? <div className="panel p-6 text-zinc-300">Chargement…</div> : error ? <div className="panel border-red-500/40 p-6 text-red-200"><p>Impossible de charger les données</p><p className="mt-1 text-sm text-red-200/70">{error}</p></div> : zones.length === 0 ? <div className="panel p-6 text-zinc-300">Aucune donnée disponible</div> : <>
       <div className="mb-5 flex items-center gap-2 text-xs font-bold"><span aria-hidden="true" className={`h-2 w-2 rounded-full ${connection === 'live' ? 'bg-emerald-400' : connection === 'offline' ? 'bg-red-400' : 'bg-orange-400'}`} /><span className={connectionColors[connection]}>{connectionLabels[connection]}</span><span className="text-zinc-600">· Mis à jour {updated.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span></div>
       <section className="mb-5 grid grid-cols-3 gap-2" aria-label="Actions rapides"><button type="button" onClick={() => router.push('/hostess')} className="rounded-xl bg-fuchsia-600 px-3 py-3 text-sm font-black text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">Nouvelle arrivée</button><button type="button" onClick={focusSearch} className="rounded-xl bg-zinc-800 px-3 py-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400">Rechercher</button><button type="button" onClick={() => router.push('/hostess?view=entrees')} className="rounded-xl bg-zinc-800 px-3 py-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400">Entrées club</button></section>

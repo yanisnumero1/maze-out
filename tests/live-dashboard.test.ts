@@ -94,9 +94,10 @@ describe('dashboard Live opérationnel', () => {
     expect(dashboardSource).toContain("window.removeEventListener('offline'");
     expect(dashboardSource).toContain("table: 'table_visits'");
     expect(dashboardSource).toContain("table: 'table_visit_transfers'");
-    expect(dashboardSource).toContain("supabase.from('night_sessions').select('started_at')");
+    expect(dashboardSource).toContain("rpc('current_operational_night_started_at')");
     expect(dashboardSource).toContain("'Aucune soirée active'");
-    expect(dashboardSource).toContain('formatDuration');
+    expect(dashboardSource).toContain('formatStartedAt');
+    expect(dashboardSource).toContain('Soirée démarrée à');
     expect(hostessHubSource).toContain("searchParams.get('view')");
     expect(hostessHubSource).toContain("setView('salle')");
   });
