@@ -10,7 +10,7 @@ const search = file('components/table-search.tsx');
 
 describe('recherche rapide de table depuis le Live', () => {
   it('recherche par numéro seul ou avec le préfixe Table, en privilégiant la correspondance exacte', () => {
-    expect(search).toContain("query.replace(/^table\\s*/, '')");
+    expect(search).toContain("query.replace(/^table\\s*/, '').replace(/\\s/g, '')");
     expect(search).toContain('String(left.display_number) === numericQuery');
     expect(search).toContain('Rechercher une table...');
   });
@@ -23,8 +23,9 @@ describe('recherche rapide de table depuis le Live', () => {
     expect(search).toContain("label: 'Occupée'");
   });
 
-  it('navigue vers une table depuis la Salle sans créer de brouillon', () => {
-    expect(live).not.toContain("from '@/components/table-search'");
+  it('navigue vers une table depuis le Live sans créer de brouillon', () => {
+    expect(live).toContain("from '@/components/table-search'");
+    expect(live).toContain('router.push(`/hostess?table=${encodeURIComponent(String(table.display_number))}`)');
     expect(search).not.toContain('prepare_arrival_draft');
   });
 
@@ -68,5 +69,8 @@ describe('recherche rapide de table depuis le Live', () => {
     expect(search).toContain('focus:ring-violet-500/30');
     expect(search).toContain('focus-visible:ring-violet-400');
     expect(search).toContain('flex-wrap');
+    expect(search).toContain("event.key === 'Escape'");
+    expect(search).toContain("event.key === 'Enter'");
+    expect(search).toContain("document.addEventListener('mousedown'");
   });
 });
