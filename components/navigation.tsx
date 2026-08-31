@@ -12,7 +12,7 @@ export function Navigation() {
   const pathname = usePathname();
   const [role, setRole] = useState<AppRole | null>(null);
 
-  const linkClass = (active: boolean) => `rounded-full px-3 py-2 font-semibold ${active ? 'bg-fuchsia-600 text-white' : 'bg-zinc-800 text-zinc-100'}`;
+  const linkClass = (active: boolean) => `min-h-11 rounded-full px-3 py-2 text-center font-semibold ${active ? 'bg-fuchsia-600 text-white' : 'bg-zinc-800 text-zinc-100'}`;
 
   useEffect(() => {
     let active = true;
@@ -37,15 +37,19 @@ export function Navigation() {
   }
 
   return (
-    <nav className="mb-5 flex items-center gap-2 border-b border-zinc-800 pb-3 text-sm">
-      <Link href="/" className="mr-auto flex items-center">
+    <nav className="mb-5 border-b border-zinc-800 pb-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+      <Link href="/" className="mr-auto flex h-11 items-center">
         <Image src="/bridge-logo.png" alt="BRIDGE — Pont Alexandre III" width={160} height={57} className="h-8 w-32 object-contain" />
       </Link>
-      <Link className={linkClass(pathname === '/')} href="/">Accueil</Link>
-      <Link className={linkClass(pathname.startsWith('/hostess'))} href="/hostess">Arrivée</Link>
-      {role === 'admin' && <Link className={linkClass(pathname.startsWith('/admin'))} href="/admin">Administration</Link>}
-      {role === 'admin' && <Link className={linkClass(pathname.startsWith('/recap'))} href={'/recap' as any}>Récapitulatif</Link>}
-      <button className="rounded-full bg-zinc-800 px-3 py-2 font-semibold" onClick={() => void signOut()}>Se déconnecter</button>
+      <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+        <Link className={linkClass(pathname === '/')} href="/">Accueil</Link>
+        <Link className={linkClass(pathname.startsWith('/hostess'))} href="/hostess">Arrivée</Link>
+        {role === 'admin' && <Link className={linkClass(pathname.startsWith('/admin'))} href="/admin">Administration</Link>}
+        {role === 'admin' && <Link className={linkClass(pathname.startsWith('/recap'))} href={'/recap' as any}>Récapitulatif</Link>}
+        <button className="min-h-11 rounded-full bg-zinc-800 px-3 py-2 font-semibold" onClick={() => void signOut()}>Se déconnecter</button>
+      </div>
+      </div>
     </nav>
   );
 }

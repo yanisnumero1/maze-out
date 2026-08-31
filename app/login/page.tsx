@@ -62,7 +62,7 @@ export default function LoginPage() {
   }
 
   return (
-    <section className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-sm items-center">
+    <section className="mx-auto flex min-h-[calc(100dvh-1.5rem)] max-w-sm items-center py-6 sm:min-h-[calc(100vh-3rem)]">
       <div className="w-full">
         <Image
           src="/bridge-logo.png"
@@ -70,9 +70,9 @@ export default function LoginPage() {
           width={480}
           height={172}
           priority
-          className="mx-auto mb-12 w-64"
+          className="mx-auto mb-8 w-48 sm:mb-12 sm:w-64"
         />
-        <div className="panel p-6 sm:p-8">
+        <div className="panel p-5 sm:p-8">
           {accessDenied ? <p className="text-center text-sm text-zinc-400">Accès non autorisé.</p> : <><h1 className="text-xl font-bold">Accès sécurisé</h1><div className="mt-6"><AuthPanel /></div></>}
         </div>
       </div>
