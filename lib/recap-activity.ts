@@ -2,7 +2,7 @@ import type { ClubEntryCount, FloorNote, OperationalAuditLog, Promoter, Promoter
 
 export type RecapActivity = {
   id: string;
-  at: string;
+  created_at: string;
   title: string;
   detail?: string | null;
   actorId?: string | null;
@@ -32,7 +32,7 @@ function auditActivity(audit: OperationalAuditLog, input: ActivityInput): RecapA
   const people = number(auditValue(audit, 'people_added'));
   const count = number(auditValue(audit, 'count'));
   const content = text(auditValue(audit, 'content'));
-  const common = { id: `audit-${audit.id}`, at: audit.created_at, actorId: audit.actor_id };
+  const common = { id: `audit-${audit.id}`, created_at: audit.created_at, actorId: audit.actor_id };
 
   switch (audit.action_type) {
     case 'table.arrival_confirmed': return { ...common, title: `${table(audit.entity_id)} · Arrivée installée` };
@@ -63,11 +63,11 @@ export function recapActivity(input: ActivityInput): RecapActivity[] {
   const table = (id: string) => `Table ${input.tableNumbers.get(id) ?? '—'}`;
   const promoterById = new Map(input.promoters.map((promoter) => [promoter.id, promoter]));
   const fallback: RecapActivity[] = [
-    ...input.visits.filter((visit) => !hasAudit('table', visit.current_table_id ?? visit.table_id)).map((visit) => ({ id: `visit-${visit.id}`, at: visit.arrived_at, title: `${table(visit.current_table_id ?? visit.table_id)} · Arrivée installée` })),
-    ...input.transfers.filter((transfer) => !hasAudit('table_visit', transfer.table_visit_id)).map((transfer) => ({ id: `transfer-${transfer.id}`, at: transfer.created_at, title: `${table(transfer.from_table_id)} → ${table(transfer.to_table_id)} · Transfert de table`, actorId: transfer.transferred_by })),
-    ...input.notes.filter((note) => !hasAudit('floor_note', note.id)).map((note) => ({ id: `note-${note.id}`, at: note.created_at, title: 'Note Piste ajoutée', detail: note.content, actorId: note.created_by })),
-    ...input.promoterEvents.filter((event) => !hasAudit('promoter_activity', event.id)).map((event) => ({ id: `promoter-${event.id}`, at: event.created_at, title: `Promoteur ${promoterById.get(event.promoter_id)?.name ?? '—'} · +${event.people_added ?? 0} personnes`, detail: event.note, actorId: event.changed_by })),
-    ...input.entryCounts.filter((entry) => !hasAudit('club_entry', entry.id)).map((entry) => ({ id: `entry-${entry.id}`, at: entry.recorded_at, title: `Entrées club · ${entry.count} personnes`, actorId: entry.created_by })),
+    ...input.visits.filter((visit) => !hasAudit('table', visit.current_table_id ?? visit.table_id)).map((visit) => ({ id: `visit-${visit.id}`, created_at: visit.arrived_at, title: `${table(visit.current_table_id ?? visit.table_id)} · Arrivée installée` })),
+    ...input.transfers.filter((transfer) => !hasAudit('table_visit', transfer.table_visit_id)).map((transfer) => ({ id: `transfer-${transfer.id}`, created_at: transfer.created_at, title: `${table(transfer.from_table_id)} → ${table(transfer.to_table_id)} · Transfert de table`, actorId: transfer.transferred_by })),
+    ...input.notes.filter((note) => !hasAudit('floor_note', note.id)).map((note) => ({ id: `note-${note.id}`, created_at: note.created_at, title: 'Note Piste ajoutée', detail: note.content, actorId: note.created_by })),
+    ...input.promoterEvents.filter((event) => !hasAudit('promoter_activity', event.id)).map((event) => ({ id: `promoter-${event.id}`, created_at: event.created_at, title: `Promoteur ${promoterById.get(event.promoter_id)?.name ?? '—'} · +${event.people_added ?? 0} personnes`, detail: event.note, actorId: event.changed_by })),
+    ...input.entryCounts.filter((entry) => !hasAudit('club_entry', entry.id)).map((entry) => ({ id: `entry-${entry.id}`, created_at: entry.recorded_at, title: `Entrées club · ${entry.count} personnes`, actorId: entry.created_by })),
   ];
-  return [...auditEvents, ...fallback].sort((left, right) => new Date(right.at).getTime() - new Date(left.at).getTime());
+  return [...auditEvents, ...fallback].sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime());
 }

@@ -15,6 +15,7 @@ describe('activité récente du récapitulatif', () => {
     const rows = recapActivity({ ...base, audits: [audit('a1', 'floor_note.created', 'floor_note', 'n1', '2026-08-30T03:21:00Z'), audit('a2', 'night.closed', 'night_session', 'night-a', '2026-08-30T04:52:00Z', 'admin')] });
     expect(rows.map((row) => row.title)).toEqual(['Soirée clôturée', 'Note Piste ajoutée']);
     expect(rows[0].actorId).toBe('admin');
+    expect(rows[0].created_at).toBe('2026-08-30T04:52:00Z');
   });
 
   it('évite le doublon audit + donnée métier pour une note et conserve le fallback historique', () => {
@@ -23,6 +24,7 @@ describe('activité récente du récapitulatif', () => {
     const historical = recapActivity({ ...base, audits: [], notes: [note] });
     expect(withAudit).toHaveLength(1);
     expect(historical).toMatchObject([{ title: 'Note Piste ajoutée', actorId: null }]);
+    expect(historical[0].created_at).toBe(note.created_at);
   });
 
   it('rend les événements auditables pour tables, transferts, promoteurs et entrées club', () => {

@@ -5,7 +5,7 @@ import { activitySummary, promoterTotal, recapRotations, recapTables, recapWaite
 import { recapActivity } from '@/lib/recap-activity';
 import { actorIdsForResolution, actorProfileMap, formatActorLabel } from '@/lib/actors';
 import { supabase } from '@/lib/supabase/client';
-import type { ClubEntryCount, FloorNote, LiveTable, NightSession, OperationalActorProfile, OperationalAuditLog, Promoter, PromoterCountEvent, TableVisit, TableVisitTransfer } from '@/lib/types';
+import type { ClubEntryCount, FloorNote, LiveTable, NightReport, NightReportDelivery, NightSession, OperationalActorProfile, OperationalAuditLog, Promoter, PromoterCountEvent, TableVisit, TableVisitTransfer } from '@/lib/types';
 
 const normaliseTables = (rows: any[]): LiveTable[] => rows.map((table) => ({ ...table, reservation: Array.isArray(table.reservation) ? table.reservation[0] ?? null : table.reservation, occupancy: Array.isArray(table.occupancy) ? table.occupancy[0] ?? null : table.occupancy }));
 const formatDate = (value: string) => new Date(value).toLocaleDateString('fr-FR');
@@ -24,6 +24,8 @@ export function RecapConsole() {
   const [transfers, setTransfers] = useState<TableVisitTransfer[]>([]);
   const [auditRows, setAuditRows] = useState<OperationalAuditLog[]>([]);
   const [actorProfiles, setActorProfiles] = useState<OperationalActorProfile[]>([]);
+  const [reports, setReports] = useState<NightReport[]>([]);
+  const [reportDeliveries, setReportDeliveries] = useState<NightReportDelivery[]>([]);
   const [showAllActivity, setShowAllActivity] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -32,7 +34,7 @@ export function RecapConsole() {
   const [openTableId, setOpenTableId] = useState<string | null>(null);
 
   async function load() {
-    const [{ data: sessionRows, error: sessionError }, { data: tableRows, error: tableError }, { data: visitRows, error: visitError }, { data: entryRows, error: entryError }, { data: promoterRows, error: promoterError }, { data: noteRows, error: noteError }, { data: promoterEventRows, error: promoterEventError }, { data: transferRows, error: transferError }, { data: auditData, error: auditError }] = await Promise.all([
+    const [{ data: sessionRows, error: sessionError }, { data: tableRows, error: tableError }, { data: visitRows, error: visitError }, { data: entryRows, error: entryError }, { data: promoterRows, error: promoterError }, { data: noteRows, error: noteError }, { data: promoterEventRows, error: promoterEventError }, { data: transferRows, error: transferError }, { data: auditData, error: auditError }, { data: reportRows, error: reportError }, { data: deliveryRows, error: deliveryError }] = await Promise.all([
       supabase.from('night_sessions').select('*').order('started_at', { ascending: false }),
       supabase.from('tables').select('*, zone:zones(*), head_waiter:head_waiters(*), reservation:reservations(*), occupancy:occupancies(*)').order('display_number'),
       supabase.from('table_visits').select('*, zone:zones(*), head_waiter:head_waiters(*)').order('arrived_at'),
@@ -42,9 +44,11 @@ export function RecapConsole() {
       supabase.from('promoter_count_events').select('*').order('created_at', { ascending: false }),
       supabase.from('table_visit_transfers').select('*').order('created_at', { ascending: false }),
       supabase.from('operational_audit_log').select('*').order('created_at', { ascending: false }),
+      supabase.from('night_reports').select('*').order('created_at', { ascending: false }),
+      supabase.from('night_report_deliveries').select('*').order('created_at', { ascending: false }),
     ]);
-    if (sessionError || tableError || visitError || entryError || promoterError || noteError || promoterEventError || transferError || auditError) {
-      console.error('[RECAP] Chargement impossible.', { sessionError, tableError, visitError, entryError, promoterError, noteError, promoterEventError, transferError, auditError });
+    if (sessionError || tableError || visitError || entryError || promoterError || noteError || promoterEventError || transferError || auditError || reportError || deliveryError) {
+      console.error('[RECAP] Chargement impossible.', { sessionError, tableError, visitError, entryError, promoterError, noteError, promoterEventError, transferError, auditError, reportError, deliveryError });
       setError('Impossible de charger le récapitulatif.');
       setLoading(false);
       return;
@@ -71,6 +75,8 @@ export function RecapConsole() {
     const { data: profiles, error: profilesError } = actorIds.length ? await supabase.rpc('get_operational_actor_profiles', { p_actor_ids: actorIds }) : { data: [], error: null };
     if (profilesError) console.error('[RECAP] Résolution des auteurs impossible.', profilesError);
     setActorProfiles((profiles ?? []) as OperationalActorProfile[]);
+    setReports((reportRows ?? []) as NightReport[]);
+    setReportDeliveries((deliveryRows ?? []) as NightReportDelivery[]);
     setLoading(false);
   }
 
@@ -84,6 +90,8 @@ export function RecapConsole() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'promoter_count_events' }, () => void load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'table_visit_transfers' }, () => void load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'operational_audit_log' }, () => void load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'night_reports' }, () => void load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'night_report_deliveries' }, () => void load())
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, []);
@@ -104,6 +112,8 @@ export function RecapConsole() {
   const finalEntries = useMemo(() => totalClubEntryCount(selectedEntries), [selectedEntries]);
   const promotersCount = useMemo(() => promoterTotal(selectedPromoters), [selectedPromoters]);
   const selectedTable = soldTables.find((table) => table.tableId === openTableId);
+  const selectedReport = reports.find((report) => report.night_session_id === sessionId) ?? null;
+  const selectedReportDeliveries = useMemo(() => selectedReport ? reportDeliveries.filter((delivery) => delivery.night_report_id === selectedReport.id) : [], [reportDeliveries, selectedReport]);
   const actors = useMemo(() => actorProfileMap(actorProfiles), [actorProfiles]);
   const activity = useMemo(() => recapActivity({
     audits: auditRows.filter((audit) => audit.night_session_id === sessionId),
@@ -151,8 +161,9 @@ export function RecapConsole() {
     {selected && <section><div className="mb-4 flex flex-wrap items-center gap-3"><h2 className="mr-auto text-xl font-bold">DÉTAIL — {formatDate(selected.started_at)}</h2><button onClick={download} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold">Exporter CSV</button>{!selected.ended_at && <button onClick={() => setConfirmClose(true)} className="rounded-xl bg-zinc-800 px-5 py-3 font-bold">Clôturer la soirée</button>}</div>
       {confirmClose && <section className="panel mb-5 border-orange-500/40 p-5"><h3 className="text-lg font-bold">Clôturer la soirée ?</h3><p className="mt-2 text-sm text-zinc-300">Cette action va figer le récapitulatif et remettre toutes les tables à zéro pour la prochaine soirée.</p><div className="mt-5 flex gap-3"><button className="rounded-xl bg-zinc-800 px-4 py-3 font-bold" onClick={() => setConfirmClose(false)}>Annuler</button><button className="rounded-xl bg-orange-500 px-4 py-3 font-bold text-zinc-950" onClick={() => void closeNight()}>Clôturer la soirée</button></div></section>}
       {notice && <p className="mb-5 text-sm font-semibold text-emerald-300">{notice}</p>}
+      <section className="mb-5 rounded-xl border border-violet-500/25 bg-violet-500/5 p-4"><p className="text-xs font-black uppercase tracking-[.16em] text-violet-200">Compte rendu</p>{!selectedReport ? <p className="mt-2 text-sm text-zinc-400">Aucun compte rendu généré pour cette soirée.</p> : <><p className="mt-2 font-bold">{selectedReport.status === 'pending' ? 'En attente d’envoi' : selectedReport.status === 'processing' ? 'Envoi en cours' : selectedReport.status === 'sent' ? `Envoyé le ${selectedReport.sent_at ? `${formatDate(selectedReport.sent_at)} à ${formatTime(selectedReport.sent_at)}` : '—'} · ${selectedReportDeliveries.filter((delivery) => delivery.status === 'sent').length} destinataire(s)` : selectedReport.status === 'partial' ? 'Partiellement envoyé' : 'Échec de l’envoi'}</p>{selectedReport.last_error && <p className="mt-1 text-sm text-zinc-400">{selectedReport.last_error}</p>}</>}</section>
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{[['TABLES VENDUES', soldTables.length], ['VENTES TOTALES', visits.length], ['PERSONNES ACCUEILLIES AUX TABLES', global.clients], ['ENTRÉES CLUB', finalEntries], ['PROMOTEURS', promotersCount + ' personnes']].map(([label, value]) => <div className="panel p-4" key={String(label)}><small>{label}</small><b className="mt-2 block text-2xl">{value}</b></div>)}</section>
-      <section className="panel mt-8 p-4" aria-label="Activité récente"><div className="flex items-center gap-3"><h2 className="mr-auto text-xl font-bold">ACTIVITÉ RÉCENTE</h2><span className="text-xs text-zinc-500">{activity.length} événement{activity.length !== 1 ? 's' : ''}</span></div><div className="mt-3 grid gap-2">{visibleActivity.length ? visibleActivity.map((item) => <article className="flex gap-3 rounded-xl bg-zinc-900/70 p-3" key={item.id}><time className="shrink-0 font-mono text-sm text-zinc-400">{formatTime(item.at)}</time><div><p className="text-sm text-zinc-200">{item.title}</p>{item.detail && <p className="mt-1 text-xs text-zinc-400">{item.detail}</p>}<p className="mt-1 text-xs text-zinc-500">{formatActorLabel(actors.get(item.actorId ?? ''))}</p></div></article>) : <p className="text-sm text-zinc-400">Aucune activité pour cette soirée.</p>}</div>{activity.length > 12 && <button onClick={() => setShowAllActivity((value) => !value)} className="mt-4 rounded-lg bg-zinc-800 px-4 py-2 text-sm font-bold text-violet-200">{showAllActivity ? 'Réduire l’activité' : 'Voir toute l’activité'}</button>}</section>
+      <section className="panel mt-8 p-4" aria-label="Activité récente"><div className="flex items-center gap-3"><h2 className="mr-auto text-xl font-bold">ACTIVITÉ RÉCENTE</h2><span className="text-xs text-zinc-500">{activity.length} événement{activity.length !== 1 ? 's' : ''}</span></div><div className="mt-3 grid gap-2">{visibleActivity.length ? visibleActivity.map((item) => <article className="flex gap-3 rounded-xl bg-zinc-900/70 p-3" key={item.id}><time className="shrink-0 font-mono text-sm text-zinc-400">{formatTime(item.created_at)}</time><div><p className="text-sm text-zinc-200">{item.title}</p>{item.detail && <p className="mt-1 text-xs text-zinc-400">{item.detail}</p>}<p className="mt-1 text-xs text-zinc-500">{formatActorLabel(actors.get(item.actorId ?? ''))}</p></div></article>) : <p className="text-sm text-zinc-400">Aucune activité pour cette soirée.</p>}</div>{activity.length > 12 && <button onClick={() => setShowAllActivity((value) => !value)} className="mt-4 rounded-lg bg-zinc-800 px-4 py-2 text-sm font-bold text-violet-200">{showAllActivity ? 'Réduire l’activité' : 'Voir toute l’activité'}</button>}</section>
       <section className="mt-8"><h2 className="mb-3 text-xl font-bold">DÉTAIL DES TABLES</h2><div className="grid gap-3 sm:grid-cols-2">{soldTables.map((table) => <button key={table.tableId} onClick={() => setOpenTableId(table.tableId)} className="panel p-4 text-left"><b className="text-lg">Table {table.tableNumber}</b><p className="mt-1 text-sm text-zinc-400">{fullName(table.waiter)} · {table.zone?.name ?? '—'}</p><p className="mt-4">{table.sales} vente{table.sales !== 1 ? 's' : ''} · {table.people} personnes accueillies</p></button>)}</div>{soldTables.length === 0 && <p className="text-sm text-zinc-400">Aucune table vendue.</p>}</section>
       {selectedTable && <section className="panel mt-4 p-5"><div className="flex gap-3"><h2 className="mr-auto text-xl font-bold">TABLE {selectedTable.tableNumber}</h2><button className="text-sm text-violet-300" onClick={() => setOpenTableId(null)}>Fermer</button></div><div className="mt-4 grid gap-3">{selectedTable.visits.map((visit, index) => <article className="rounded-xl bg-zinc-800 p-4" key={visit.id}><b>Vente #{visit.sale_number ?? index + 1}</b><p className="mt-2 text-sm text-zinc-400">{formatTime(visit.arrived_at)} → {visit.ended_at ? formatTime(visit.ended_at) : 'en cours'}</p><p className="mt-2">{visit.present_people} personnes · {visit.extra_guests} invité{visit.extra_guests !== 1 ? 's' : ''} · Total : {visit.present_people + visit.extra_guests}</p></article>)}</div></section>}
       <section className="mt-8"><h2 className="mb-3 text-xl font-bold">TABLES LES PLUS VENDUES</h2><div className="grid gap-2">{rotations.map((table) => <div className="panel flex p-3" key={table.tableId}><span className="mr-auto">Table {table.tableNumber}</span><b>{table.sales} vente{table.sales !== 1 ? 's' : ''}</b></div>)}</div></section>
