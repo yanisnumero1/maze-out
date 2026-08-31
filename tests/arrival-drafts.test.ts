@@ -57,7 +57,7 @@ describe('brouillons et ventes de tables', () => {
     expect(hostess).toContain('Préparer l’arrivée');
     expect(hostess).toContain('Confirmer l’installation sur la Table');
     expect(hostess).toContain('Changer de table');
-    expect(hostess).toContain("disabled={confirming}");
+    expect(hostess).toContain("disabled={confirming || !hasDraftPeople}");
     expect(hostess).toContain("'Confirmation...'");
   });
 
