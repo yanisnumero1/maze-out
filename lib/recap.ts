@@ -1,4 +1,4 @@
-import type { ClubEntryCount, FloorNote, HeadWaiter, LiveTable, Promoter, TableVisit, Zone } from './types';
+import type { ClubEntryCount, FloorNote, HeadWaiter, LiveTable, Promoter, TableVisit, TableVisitTransfer, Zone } from './types';
 
 export type ActivitySummary = {
   clients: number;
@@ -70,3 +70,60 @@ export const recapRotations = (tables: RecapTable[]) => [...tables].sort((left, 
 export const totalClubEntryCount = (counts: ClubEntryCount[]) => counts.reduce((total, entry) => total + entry.count, 0);
 export const promoterTotal = (promoters: Promoter[]) => promoters.reduce((total, promoter) => total + promoter.entry_count, 0);
 export const selectedNightNotes = (notes: FloorNote[], nightSessionId: string) => notes.filter((note) => note.night_session_id === nightSessionId).sort((left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime());
+
+export type RecapRanking = {
+  id: string;
+  label: string;
+  sales: number;
+  people: number;
+  tables: number;
+  rotations: number;
+  share: number;
+};
+
+export type RecapAnalytics = {
+  totalSales: number;
+  totalPeople: number;
+  distinctTables: number;
+  rotations: number;
+  transferredVisits: number;
+  tableRows: RecapTable[];
+  topSalesTables: RecapTable[];
+  topPeopleTables: RecapTable[];
+  zones: RecapRanking[];
+  waiters: RecapRanking[];
+  promoters: { id: string; label: string; people: number; share: number }[];
+};
+
+const percentage = (value: number, total: number) => total ? Math.round((value / total) * 100) : 0;
+const tableNumber = (table: RecapTable) => Number(table.tableNumber) || Number.MAX_SAFE_INTEGER;
+
+export function recapAnalytics(tables: LiveTable[], visits: TableVisit[], transfers: TableVisitTransfer[], promoters: Promoter[]): RecapAnalytics {
+  const tableRows = recapTables(visits, new Map(tables.map((table) => [table.id, table.display_number ?? table.number])));
+  const totalSales = visits.length;
+  const totalPeople = activitySummary(visits, tables.length).clients;
+  const distinctTables = tableRows.length;
+  const rotations = tableRows.reduce((total, table) => total + Math.max(0, table.sales - 1), 0);
+  const zones = recapZones(tables, visits).map(({ zone, summary }) => {
+    const sales = visits.filter((visit) => visit.zone_id === zone.id).length;
+    return { id: zone.id, label: zone.name, sales, people: summary.clients, tables: summary.usedTables, rotations: Math.max(0, sales - summary.usedTables), share: percentage(sales, totalSales) };
+  }).sort((left, right) => right.sales - left.sales || left.label.localeCompare(right.label, 'fr'));
+  const waiters = recapWaiters(tables, visits).map(({ waiter, summary }) => {
+    const sales = visits.filter((visit) => visit.head_waiter_id === waiter.id).length;
+    return { id: waiter.id, label: `${waiter.first_name} ${waiter.last_name}`.trim(), sales, people: summary.clients, tables: summary.usedTables, rotations: Math.max(0, sales - summary.usedTables), share: percentage(sales, totalSales) };
+  }).sort((left, right) => right.sales - left.sales || left.label.localeCompare(right.label, 'fr'));
+  const totalPromoters = promoterTotal(promoters);
+  return {
+    totalSales,
+    totalPeople,
+    distinctTables,
+    rotations,
+    transferredVisits: transfers.length,
+    tableRows,
+    topSalesTables: [...tableRows].sort((left, right) => right.sales - left.sales || tableNumber(left) - tableNumber(right)).slice(0, 10),
+    topPeopleTables: [...tableRows].sort((left, right) => right.people - left.people || tableNumber(left) - tableNumber(right)).slice(0, 10),
+    zones,
+    waiters,
+    promoters: [...promoters].map((promoter) => ({ id: promoter.id, label: promoter.name, people: promoter.entry_count, share: percentage(promoter.entry_count, totalPromoters) })).sort((left, right) => right.people - left.people || left.label.localeCompare(right.label, 'fr')),
+  };
+}

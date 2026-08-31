@@ -18,22 +18,49 @@ function rows(items: any[], cells: (item: any) => string) {
   return items.length ? `<ul>${items.map((item) => `<li>${cells(item)}</li>`).join('')}</ul>` : '<p>Aucune donnée.</p>';
 }
 
+function bars(items: any[], valueOf: (item: any) => number, label: (item: any, index: number) => string) {
+  const maximum = Math.max(0, ...items.map(valueOf));
+  if (!items.length) return '<p style="color:#a1a1aa">Aucune donnée.</p>';
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">${items.map((item, index) => {
+    const value = valueOf(item);
+    const percent = maximum ? Math.max(4, Math.round((value / maximum) * 100)) : 0;
+    return `<tr><td style="padding:7px 0;color:#f4f4f5"><b>${escape(label(item, index))}</b></td></tr><tr><td style="padding:0 0 12px"><div style="height:8px;background:#27272a;border-radius:999px"><div style="height:8px;width:${percent}%;background:#d946ef;border-radius:999px"></div></div></td></tr>`;
+  }).join('')}</table>`;
+}
+
 function reportEmail(snapshot: Record<string, any>) {
   const night = snapshot.night_session ?? {};
   const summary = snapshot.summary ?? {};
+  const analytics = snapshot.analytics ?? {};
+  const performance = snapshot.performance ?? {};
   const date = night.started_at ? formatDate(night.started_at) : '—';
   const duration = night.started_at && night.ended_at ? `${formatTime(night.started_at)} → ${formatTime(night.ended_at)}` : '—';
-  const zones = rows(snapshot.zones ?? [], (zone) => `<b>${escape(zone.name)}</b> — ${escape(zone.tables_sold)} / ${escape(zone.total_tables)} tables, ${escape(zone.total_sales)} ventes, ${escape(zone.people_welcomed)} personnes`);
-  const waiters = rows(snapshot.head_waiters ?? [], (waiter) => `<b>${escape(waiter.name)}</b> — ${escape(waiter.tables_sold)} / ${escape(waiter.assigned_tables)} tables, ${escape(waiter.people_welcomed)} personnes`);
-  const promoters = rows(snapshot.promoters ?? [], (promoter) => `${escape(promoter.name)} — ${escape(promoter.people_welcomed)} personnes`);
+  const zonesData = performance.zones ?? snapshot.zones ?? [];
+  const waitersData = performance.head_waiters ?? snapshot.head_waiters ?? [];
+  const topTables = snapshot.top_tables ?? [];
+  const promotersData = snapshot.promoters_ranked ?? snapshot.promoters ?? [];
+  const zones = bars(zonesData, (zone) => Number(zone.total_sales ?? 0), (zone) => `${zone.name} — ${zone.total_sales ?? 0} ventes · ${zone.people_welcomed ?? 0} personnes`);
+  const waiters = bars(waitersData, (waiter) => Number(waiter.total_sales ?? 0), (waiter, index) => `${index < 3 ? `#${index + 1} · ` : ''}${waiter.name} — ${waiter.total_sales ?? 0} ventes · ${waiter.people_welcomed ?? 0} personnes`);
+  const tables = bars(topTables, (table) => Number(table.total_sales ?? 0), (table) => `Table ${table.table_number} — ${table.total_sales} ventes · ${table.people_welcomed} personnes`);
+  const promoters = rows(promotersData, (promoter) => `${escape(promoter.name)} — ${escape(promoter.people_welcomed)} personnes`);
   const notes = rows(snapshot.floor_notes ?? [], (note) => `${escape(note.created_at ? formatTime(note.created_at) : '')} — ${escape(note.content)}`);
   const activity = rows((snapshot.recent_activity ?? []).slice(0, 15), (item) => {
     const actor = item.actor_name ? `${item.actor_name}${item.actor_role ? ` · ${item.actor_role}` : ''}` : 'Auteur inconnu';
     return `${escape(item.created_at ? formatTime(item.created_at) : '')} — ${escape(item.title ?? 'Activité')}${item.detail ? `<br><span>${escape(item.detail)}</span>` : ''}<br><small>${escape(actor)}</small>`;
   });
+  const topWaiter = waitersData[0];
+  const topZone = zonesData[0];
+  const topTable = topTables[0];
+  const topPromoter = promotersData[0];
+  const highlights = [
+    topWaiter && `CDR le plus actif : ${topWaiter.name} avec ${topWaiter.total_sales ?? 0} ventes.`,
+    topZone && `Carré le plus actif : ${topZone.name} avec ${topZone.total_sales ?? 0} ventes.`,
+    topTable && `Table la plus sollicitée : Table ${topTable.table_number} avec ${topTable.total_sales} ventes.`,
+    topPromoter && `Promoteur n°1 : ${topPromoter.name} avec ${topPromoter.people_welcomed} personnes.`,
+  ].filter(Boolean);
   return {
     subject: `Compte rendu de soirée — BRIDGE — ${date}`,
-    html: `<!doctype html><html lang="fr"><body style="margin:0;background:#09090b;color:#f4f4f5;font-family:Arial,sans-serif"><main style="max-width:640px;margin:auto;padding:24px"><h1 style="margin:0;color:#fff">BRIDGE</h1><p style="color:#d4d4d8">Compte rendu de soirée · ${escape(date)}</p><section><p><b>Début / fin</b> : ${escape(duration)}</p></section><h2>RÉSUMÉ</h2><ul><li>Tables vendues : ${escape(value(summary, 'distinct_tables_sold'))}</li><li>Ventes totales : ${escape(value(summary, 'total_sales'))}</li><li>Personnes accueillies : ${escape(value(summary, 'people_welcomed'))}</li><li>Entrées club : ${escape(value(summary, 'club_entries'))}</li></ul><h2>CARRÉS</h2>${zones}<h2>CDR</h2>${waiters}<h2>PROMOTEURS</h2>${promoters}<h2>PISTE</h2>${notes}<h2>ACTIVITÉ RÉCENTE</h2>${activity}</main></body></html>`,
+    html: `<!doctype html><html lang="fr"><body style="margin:0;background:#09090b;color:#f4f4f5;font-family:Arial,sans-serif"><main style="max-width:640px;margin:auto;padding:24px"><h1 style="margin:0;color:#fff">MAZE-OUT · BRIDGE</h1><p style="color:#d4d4d8">COMPTE RENDU DE SOIRÉE · ${escape(date)} · ${escape(duration)}</p><h2>RÉSUMÉ</h2><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td style="padding:8px;background:#18181b">${escape(value(summary, 'total_sales'))}<br><small>VENTES</small></td><td style="padding:8px;background:#18181b">${escape(value(summary, 'people_welcomed'))}<br><small>PERSONNES AUX TABLES</small></td></tr><tr><td style="padding:8px;background:#18181b">${escape(value(analytics, 'distinct_tables_sold') ?? value(summary, 'distinct_tables_sold'))}<br><small>TABLES EXPLOITÉES</small></td><td style="padding:8px;background:#18181b">${escape(value(analytics, 'rotation_count'))}<br><small>ROTATIONS</small></td></tr><tr><td style="padding:8px;background:#18181b">${escape(value(analytics, 'transfer_count'))}<br><small>TRANSFERTS</small></td><td style="padding:8px;background:#18181b">${escape(value(summary, 'club_entries'))}<br><small>ENTRÉES CLUB</small></td></tr><tr><td style="padding:8px;background:#18181b">${escape(value(analytics, 'promoter_people'))}<br><small>PROMOTEURS</small></td><td style="padding:8px;background:#18181b">${escape(value(analytics, 'floor_note_count'))}<br><small>NOTES PISTE</small></td></tr></table><h2>PERFORMANCE CDR</h2>${waiters}<h2>PERFORMANCE PAR CARRÉ</h2>${zones}<h2>TOP TABLES</h2>${tables}<h2>PROMOTEURS</h2>${promoters}<h2>ENTRÉES CLUB</h2><p><b>${escape(value(summary, 'club_entries'))} entrées</b></p><h2>PISTE</h2>${notes}<h2>POINTS CLÉS</h2>${rows(highlights, (point) => escape(point))}<h2>ACTIVITÉ RÉCENTE</h2>${activity}</main></body></html>`,
   };
 }
 
