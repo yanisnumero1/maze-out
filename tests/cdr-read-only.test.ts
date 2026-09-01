@@ -24,9 +24,12 @@ describe('accès CDR lecture seule', () => {
     expect(migration).toContain('role scoped head waiter read');
     expect(migration).toContain('id = public.cdr_head_waiter_id()');
   });
-  it('ne donne pas de politique ni de composant d’écriture au CDR', () => {
+  it('ne donne pas de politique ni de composant d’écriture directe au CDR', () => {
     expect(migration).not.toMatch(/create policy[^;]*(insert|update|delete)[^;]*cdr/i);
-    expect(consoleSource).not.toContain('.rpc(');
+    expect(consoleSource).toContain("rpc('update_cdr_visit_notes'");
+    expect(consoleSource).not.toContain("rpc('prepare_arrival_draft'");
+    expect(consoleSource).not.toContain("rpc('transfer_operational_table'");
+    expect(consoleSource).not.toContain("rpc('release_operational_table'");
     expect(consoleSource).not.toContain('.insert(');
     expect(consoleSource).not.toContain('.update(');
     expect(consoleSource).not.toContain('.delete(');
@@ -38,6 +41,7 @@ describe('accès CDR lecture seule', () => {
     expect(consoleSource).toContain("supabase.channel('cdr-live')");
     expect(consoleSource).toContain("table: 'occupancies'");
     expect(consoleSource).toContain("table: 'tables'");
+    expect(consoleSource).toContain("table: 'table_visits'");
     expect(consoleSource).toContain(".order('display_number')");
   });
 });
