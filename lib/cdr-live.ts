@@ -1,6 +1,16 @@
 import type { LiveTable, TableVisit } from './types';
 
 export type CdrLiveTableRow = { table: LiveTable; visit: TableVisit | null };
+const tableLabelCollator = new Intl.Collator('fr-FR', { numeric: true, sensitivity: 'base' });
+
+function compareCdrTables(left: LiveTable, right: LiveTable): number {
+  const leftDisplayNumber = left.display_number;
+  const rightDisplayNumber = right.display_number;
+  if (typeof leftDisplayNumber === 'number' && typeof rightDisplayNumber === 'number' && leftDisplayNumber !== rightDisplayNumber) {
+    return leftDisplayNumber - rightDisplayNumber;
+  }
+  return tableLabelCollator.compare(left.number, right.number) || left.id.localeCompare(right.id);
+}
 
 export function cdrLiveTableRows(tables: LiveTable[], visits: TableVisit[], headWaiterId: string): CdrLiveTableRow[] {
   const activeVisitsByCurrentTable = new Map(
@@ -11,6 +21,6 @@ export function cdrLiveTableRows(tables: LiveTable[], visits: TableVisit[], head
 
   return tables
     .filter((table) => table.head_waiter_id === headWaiterId)
-    .sort((left, right) => (left.display_number ?? Number(left.number)) - (right.display_number ?? Number(right.number)))
+    .sort(compareCdrTables)
     .map((table) => ({ table, visit: activeVisitsByCurrentTable.get(table.id) ?? null }));
 }
