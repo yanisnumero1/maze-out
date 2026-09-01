@@ -47,5 +47,7 @@ describe('analyses détaillées du récapitulatif', () => {
     expect(worker).toContain('TOP TABLES');
     expect(worker).toContain('POINTS CLÉS');
     expect(worker).toContain('bars(');
+    expect(worker).toContain('APPORTEURS D’AFFAIRES');
+    expect(worker).toContain('NOTES CDR');
   });
 });

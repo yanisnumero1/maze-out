@@ -96,6 +96,59 @@ export type RecapAnalytics = {
   promoters: { id: string; label: string; people: number; share: number }[];
 };
 
+export type CdrVisitNote = {
+  visitId: string;
+  tableId: string;
+  tableNumber: string;
+  saleNumber: number | null;
+  headWaiterName: string;
+  people: number;
+  businessReferrer: string | null;
+  cdrComment: string | null;
+};
+
+export type BusinessReferrerRanking = {
+  key: string;
+  label: string;
+  sales: number;
+  people: number;
+};
+
+const meaningfulText = (value: string | null | undefined) => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+};
+
+export function cdrVisitNotes(visits: TableVisit[], tableNumbers: Map<string, number | string>): CdrVisitNote[] {
+  return visits
+    .map((visit) => ({
+      visitId: visit.id,
+      tableId: visit.table_id,
+      tableNumber: String(tableNumbers.get(visit.table_id) ?? visit.table_id),
+      saleNumber: visit.sale_number ?? null,
+      headWaiterName: visit.head_waiter ? `${visit.head_waiter.first_name} ${visit.head_waiter.last_name}`.trim() : 'CDR non attribué',
+      people: visit.present_people + visit.extra_guests,
+      businessReferrer: meaningfulText(visit.business_referrer),
+      cdrComment: meaningfulText(visit.cdr_comment),
+    }))
+    .filter((visit) => visit.businessReferrer !== null || visit.cdrComment !== null)
+    .sort((left, right) => left.tableNumber.localeCompare(right.tableNumber, 'fr', { numeric: true }) || (left.saleNumber ?? 0) - (right.saleNumber ?? 0));
+}
+
+export function businessReferrerRanking(visits: TableVisit[]): BusinessReferrerRanking[] {
+  const rankings = new Map<string, BusinessReferrerRanking>();
+  for (const visit of visits) {
+    const label = meaningfulText(visit.business_referrer);
+    if (!label) continue;
+    const key = label.toLocaleLowerCase('fr-FR');
+    const current = rankings.get(key) ?? { key, label, sales: 0, people: 0 };
+    current.sales += 1;
+    current.people += visit.present_people + visit.extra_guests;
+    rankings.set(key, current);
+  }
+  return [...rankings.values()].sort((left, right) => right.people - left.people || right.sales - left.sales || left.label.localeCompare(right.label, 'fr'));
+}
+
 const percentage = (value: number, total: number) => total ? Math.round((value / total) * 100) : 0;
 const compareRecapTableNumbers = (left: RecapTable, right: RecapTable) => compareTableDisplayNumbers(String(left.tableNumber), String(right.tableNumber));
 const recapTableDisplayValue = (table: LiveTable): number | string => {
