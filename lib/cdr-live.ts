@@ -3,6 +3,13 @@ import type { LiveTable, TableVisit } from './types';
 export type CdrLiveTableRow = { table: LiveTable; visit: TableVisit | null };
 const tableLabelCollator = new Intl.Collator('fr-FR', { numeric: true, sensitivity: 'base' });
 
+export function getTableDisplayNumber(table: { display_number?: number | string | null; number: string }): string {
+  const displayNumber = table.display_number;
+  if (typeof displayNumber === 'string' && displayNumber.trim().length > 0) return displayNumber;
+  if (typeof displayNumber === 'number') return String(displayNumber);
+  return table.number;
+}
+
 function compareCdrTables(left: LiveTable, right: LiveTable): number {
   const leftDisplayNumber = left.display_number;
   const rightDisplayNumber = right.display_number;

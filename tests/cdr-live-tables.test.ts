@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cdrLiveTableRows } from '@/lib/cdr-live';
+import { cdrLiveTableRows, getTableDisplayNumber } from '@/lib/cdr-live';
 import type { HeadWaiter, LiveTable, TableVisit, Zone } from '@/lib/types';
 
 const zone: Zone = { id: 'zone-1', name: 'Carré 1', display_order: 1, active: true };
@@ -39,5 +39,12 @@ describe('liste Live CDR fondée sur les tables affectées', () => {
     expect(rows.map(({ table: rowTable }) => rowTable.id)).toContain('uuid-1');
     expect(rows.map(({ table: rowTable }) => rowTable.id)).toContain('uuid-op');
     expect(rows.find(({ table: rowTable }) => rowTable.id === 'uuid-01')?.visit?.id).toBe('visit-01');
+  });
+  it('utilise un fallback de libellé robuste sans supprimer les zéros initiaux', () => {
+    expect(getTableDisplayNumber(table('uuid-null', '01', samir))).toBe('01');
+    expect(getTableDisplayNumber({ ...table('uuid-empty', '01', samir), display_number: '' })).toBe('01');
+    expect(getTableDisplayNumber({ ...table('uuid-display', '01', samir), display_number: '1' })).toBe('1');
+    expect(getTableDisplayNumber(table('uuid-op', 'OP-1-alhan-01', samir))).toBe('OP-1-alhan-01');
+    expect(getTableDisplayNumber(table('uuid-zero', '01', samir))).not.toBe('1');
   });
 });
