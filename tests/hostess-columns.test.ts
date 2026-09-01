@@ -33,6 +33,15 @@ describe('vue salle Hôtesse en colonnes', () => {
     expect(hostess).not.toContain('>HÔTESSE</h1>');
   });
 
+  it('affiche les quatre carrés dans une grille compacte fixe de deux colonnes', () => {
+    const start = hostess.indexOf("if (screen === 'zones')");
+    const zoneScreen = hostess.slice(start, hostess.indexOf('\n\n  return <>', start));
+    expect(zoneScreen).toContain('grid grid-cols-2 gap-3 sm:gap-4');
+    expect(zoneScreen).not.toContain('lg:grid-cols-4');
+    expect(zoneScreen).toContain('summary.available');
+    expect(zoneScreen).toContain('onClick={() => openZone(item)}');
+  });
+
   it('présente les indicateurs du carré avec sa capacité réelle', () => {
     expect(hostess).toContain('Tables utilisées : {zoneSummary.occupied} / {inZone.length}');
     expect(hostess).toContain('Capacité zone : {zoneSummary.present} / {zone.max_capacity}');

@@ -49,7 +49,7 @@ describe('recherche rapide de table depuis le Live', () => {
     expect(hostess).toContain("import { TableSearch } from '@/components/table-search'");
     const zoneScreen = hostess.slice(hostess.indexOf("if (screen === 'zones')"));
     expect(zoneScreen).toContain('<TableSearch tables={tables} drafts={drafts}');
-    expect(zoneScreen.indexOf('<TableSearch')).toBeLessThan(zoneScreen.indexOf('<section className="grid gap-4">'));
+    expect(zoneScreen.indexOf('<TableSearch')).toBeLessThan(zoneScreen.indexOf('<section className="grid grid-cols-2'));
     expect(hostess).toContain('router.replace(`/hostess?table=${encodeURIComponent(String(table.display_number))}`)');
   });
 
