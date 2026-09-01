@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { cdrLiveTableRows } from '@/lib/cdr-live';
 import { presentTotal, stats } from '@/lib/live';
 import { supabase } from '@/lib/supabase/client';
 import type { LiveTable, TableVisit } from '@/lib/types';
@@ -18,6 +19,7 @@ export function CdrConsole() {
   const router = useRouter();
   const [tables, setTables] = useState<LiveTable[]>([]);
   const [visits, setVisits] = useState<TableVisit[]>([]);
+  const [headWaiterId, setHeadWaiterId] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, NoteDraft>>({});
   const [saveStates, setSaveStates] = useState<Record<string, SaveState>>({});
   const [name, setName] = useState('Chef de rang');
@@ -36,17 +38,23 @@ export function CdrConsole() {
       supabase.from('tables').select('*, zone:zones(*), head_waiter:head_waiters(*), occupancy:occupancies(*)').eq('active', true).order('display_number'),
       supabase.from('table_visits').select('*').is('ended_at', null),
     ]);
-    if (tableResult.error || visitResult.error) {
-      console.error('[CDR] Impossible de charger le Live CDR.', tableResult.error ?? visitResult.error);
+    if (tableResult.error) {
+      console.error('[CDR] Impossible de charger les tables autorisées.', tableResult.error);
       setError('Impossible de charger vos tables.'); setLoading(false); return;
     }
     const loadedTables = normalise(tableResult.data ?? []);
-    const loadedVisits = (visitResult.data ?? []) as TableVisit[];
     const waiter = loadedTables[0]?.head_waiter;
     setName(waiter ? `${waiter.first_name} ${waiter.last_name}`.trim() : `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || 'Chef de rang');
+    setHeadWaiterId(profile.head_waiter_id);
     setTables(loadedTables);
-    setVisits(loadedVisits);
-    setNotes(Object.fromEntries(loadedVisits.map((visit) => [visit.id, { comment: visit.cdr_comment ?? '', referrer: visit.business_referrer ?? '' }])));
+    if (visitResult.error) {
+      console.error('[CDR] Impossible de charger les visites actives.', visitResult.error);
+      setVisits([]);
+    } else {
+      const loadedVisits = (visitResult.data ?? []) as TableVisit[];
+      setVisits(loadedVisits);
+      setNotes(Object.fromEntries(loadedVisits.map((visit) => [visit.id, { comment: visit.cdr_comment ?? '', referrer: visit.business_referrer ?? '' }])));
+    }
     setError(null); setLoading(false);
   }, []);
 
@@ -60,9 +68,8 @@ export function CdrConsole() {
     return () => { void supabase.removeChannel(channel); };
   }, [refresh]);
 
-  const orderedTables = useMemo(() => [...tables].sort((a, b) => (a.display_number ?? Number(a.number)) - (b.display_number ?? Number(b.number))), [tables]);
-  const summary = stats(orderedTables);
-  const visitsByTable = useMemo(() => new Map(visits.map((visit) => [visit.current_table_id ?? visit.table_id, visit])), [visits]);
+  const tableRows = useMemo(() => headWaiterId ? cdrLiveTableRows(tables, visits, headWaiterId) : [], [headWaiterId, tables, visits]);
+  const summary = stats(tableRows.map(({ table }) => table));
 
   function updateNote(visitId: string, key: keyof NoteDraft, value: string) {
     setNotes((current) => ({ ...current, [visitId]: { comment: current[visitId]?.comment ?? '', referrer: current[visitId]?.referrer ?? '', [key]: value } }));
@@ -92,13 +99,12 @@ export function CdrConsole() {
     </header>
     {loading ? <p className="panel p-5 text-center text-sm text-zinc-400">Chargement de vos tables...</p> : error ? <p className="panel p-5 text-center text-sm text-red-300">{error}</p> : <>
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="Indicateurs de mon rang">
-        {[['Tables', orderedTables.length], ['Occupées', summary.occupied], ['Libres', summary.available], ['Personnes', summary.present]].map(([label, value]) => <article className="panel p-3" key={String(label)}><p className="text-xs text-zinc-400">{label}</p><p className="mt-1 text-2xl font-black">{value}</p></article>)}
+        {[['Tables', tableRows.length], ['Occupées', summary.occupied], ['Libres', summary.available], ['Personnes', summary.present]].map(([label, value]) => <article className="panel p-3" key={String(label)}><p className="text-xs text-zinc-400">{label}</p><p className="mt-1 text-2xl font-black">{value}</p></article>)}
       </section>
       <section className="mt-6 grid gap-3 sm:grid-cols-2" aria-label="Mes tables">
-        {orderedTables.map((table) => {
+        {tableRows.map(({ table, visit }) => {
           const total = presentTotal(table);
           const occupied = total > 0;
-          const visit = visitsByTable.get(table.id);
           const state = visit ? saveStates[visit.id] ?? 'idle' : 'idle';
           const draft = visit ? notes[visit.id] ?? { comment: visit.cdr_comment ?? '', referrer: visit.business_referrer ?? '' } : null;
           return <article className={`min-h-28 rounded-2xl border p-4 ${occupied ? 'border-fuchsia-500/50 bg-fuchsia-950/30' : 'border-zinc-700 bg-zinc-900/80'}`} key={table.id}>
@@ -112,7 +118,7 @@ export function CdrConsole() {
           </article>;
         })}
       </section>
-      {orderedTables.length === 0 && <p className="panel mt-6 p-5 text-center text-sm text-zinc-400">Aucune table active ne vous est actuellement attribuée.</p>}
+      {tableRows.length === 0 && <p className="panel mt-6 p-5 text-center text-sm text-zinc-400">Aucune table active ne vous est actuellement attribuée.</p>}
     </>}
   </main>;
 }
