@@ -32,7 +32,7 @@ export default function LoginPage() {
         .eq('id', sessionData.session.user.id)
         .single();
 
-      if (profileError || !['admin', 'hostess'].includes(profile?.role ?? '')) {
+      if (profileError || !['admin', 'hostess', 'cdr'].includes(profile?.role ?? '')) {
         console.error('[AUTH] Profil invalide ou inaccessible.', profileError);
         if (active) {
           setAccessDenied(true);
@@ -41,7 +41,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.replace('/');
+      router.replace(profile?.role === 'cdr' ? '/cdr' : '/');
     }
 
     void redirectIfAuthenticated();

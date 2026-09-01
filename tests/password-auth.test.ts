@@ -21,9 +21,9 @@ describe('authentification par mot de passe', () => {
     expect(login).toContain('Adresse e-mail ou mot de passe incorrect.');
   });
 
-  it('vérifie le profil admin ou hostess avant la redirection', () => {
-    expect(login).toContain("['admin', 'hostess']");
-    expect(login).toContain("router.replace('/')");
+  it('vérifie le profil admin, hostess ou cdr avant la redirection', () => {
+    expect(login).toContain("['admin', 'hostess', 'cdr']");
+    expect(login).toContain("router.replace(profile?.role === 'cdr' ? '/cdr' : '/')");
   });
 
   it('utilise le flux Supabase de réinitialisation dédié', () => {

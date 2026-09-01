@@ -23,7 +23,7 @@ export function Navigation() {
         .select('role')
         .eq('id', data.session.user.id)
         .single();
-      if (!error && (profile?.role === 'admin' || profile?.role === 'hostess') && active) {
+      if (!error && (profile?.role === 'admin' || profile?.role === 'hostess' || profile?.role === 'cdr') && active) {
         setRole(profile.role);
       }
     });
@@ -43,10 +43,12 @@ export function Navigation() {
         <Image src="/bridge-logo.png" alt="BRIDGE — Pont Alexandre III" width={160} height={57} className="h-8 w-32 object-contain" />
       </Link>
       <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+        {role === 'cdr' ? <Link className={linkClass(pathname.startsWith('/cdr'))} href="/cdr">Live</Link> : <>
         <Link className={linkClass(pathname === '/')} href="/">Accueil</Link>
         <Link className={linkClass(pathname.startsWith('/hostess'))} href="/hostess">Arrivée</Link>
         {role === 'admin' && <Link className={linkClass(pathname.startsWith('/admin'))} href="/admin">Administration</Link>}
         {role === 'admin' && <Link className={linkClass(pathname.startsWith('/recap'))} href={'/recap' as any}>Récapitulatif</Link>}
+        </>}
         <button className="min-h-11 rounded-full bg-zinc-800 px-3 py-2 font-semibold" onClick={() => void signOut()}>Se déconnecter</button>
       </div>
       </div>

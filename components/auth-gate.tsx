@@ -5,9 +5,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 
-export type AppRole = 'admin' | 'hostess';
+export type AppRole = 'admin' | 'hostess' | 'cdr';
 
-export function AuthGate({ children, requireAdmin = false }: { children: React.ReactNode; requireAdmin?: boolean }) {
+export function AuthGate({ children, requireAdmin = false, requireCdr = false }: { children: React.ReactNode; requireAdmin?: boolean; requireCdr?: boolean }) {
   const router = useRouter();
   const [state, setState] = useState<'checking' | 'allowed'>('checking');
 
@@ -27,14 +27,24 @@ export function AuthGate({ children, requireAdmin = false }: { children: React.R
         .single();
 
       const role = profile?.role as AppRole | undefined;
-      if (error || (role !== 'admin' && role !== 'hostess')) {
+      if (error || (role !== 'admin' && role !== 'hostess' && role !== 'cdr')) {
         console.error('[AUTH] Profil invalide ou inaccessible.', error);
         if (active) router.replace('/login' as any);
         return;
       }
 
       if (requireAdmin && role !== 'admin') {
+        if (active) router.replace(role === 'cdr' ? '/cdr' : '/');
+        return;
+      }
+
+      if (requireCdr && role !== 'cdr') {
         if (active) router.replace('/');
+        return;
+      }
+
+      if (!requireCdr && role === 'cdr') {
+        if (active) router.replace('/cdr');
         return;
       }
 
@@ -56,7 +66,7 @@ export function AuthGate({ children, requireAdmin = false }: { children: React.R
       active = false;
       subscription.unsubscribe();
     };
-  }, [requireAdmin, router]);
+  }, [requireAdmin, requireCdr, router]);
 
   if (state === 'checking') {
     return <p className="p-5 text-center text-sm text-zinc-400">Connexion en cours...</p>;

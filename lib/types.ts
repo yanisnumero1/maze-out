@@ -1,6 +1,6 @@
 export type TableStatus = 'free' | 'reserved' | 'occupied' | 'light_overload' | 'overload' | 'unavailable';
 export type ReservationStatus = 'reserved' | 'arrived' | 'cancelled' | 'no_show' | 'completed';
-export type Role = 'admin' | 'hostess' | 'head_waiter' | 'observer';
+export type Role = 'admin' | 'hostess' | 'cdr' | 'head_waiter' | 'observer';
 export interface Zone { id: string; name: string; display_order: number; active: boolean; max_capacity?: number | null }
 export interface HeadWaiter { id: string; first_name: string; last_name: string; color: string | null; active: boolean }
 export interface NightTable { id: string; number: string; display_number?: number | null; zone_id: string; head_waiter_id: string | null; standard_capacity: number; max_people?: number | null; max_extra_guests?: number | null; status: TableStatus; position_x: number; position_y: number; active: boolean }

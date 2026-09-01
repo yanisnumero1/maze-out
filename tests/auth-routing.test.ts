@@ -9,6 +9,7 @@ const home = file('app/page.tsx');
 const hostess = file('app/hostess/page.tsx');
 const admin = file('app/admin/page.tsx');
 const recap = file('app/recap/page.tsx');
+const cdr = file('app/cdr/page.tsx');
 
 describe('authentification et navigation', () => {
   it('redirige les visiteurs sans session vers /login', () => {
@@ -25,6 +26,12 @@ describe('authentification et navigation', () => {
     expect(recap).toContain('<AuthGate requireAdmin>');
   });
 
+  it('isole le rôle CDR sur sa page Live dédiée', () => {
+    expect(cdr).toContain('<AuthGate requireCdr>');
+    expect(gate).toContain("role === 'cdr'");
+    expect(gate).toContain("router.replace('/cdr')");
+  });
+
   it('ne charge pas les données métier côté serveur avant le garde', () => {
     for (const source of [home, hostess, admin]) {
       expect(source).not.toContain('getLiveTables');
@@ -32,14 +39,15 @@ describe('authentification et navigation', () => {
     }
   });
 
-  it('n’expose que la navigation admin ou hôtesse', () => {
+  it('n’expose que la navigation autorisée à chaque rôle', () => {
     expect(navigation).toContain('Accueil');
     expect(navigation).toContain('Arrivée');
     expect(navigation).not.toContain('>Hôtesse</Link>');
     expect(navigation).toContain('Administration');
     expect(navigation).toContain("role === 'admin'");
     expect(navigation).toContain('Récapitulatif');
-    expect(navigation).not.toContain('CDR');
+    expect(navigation).toContain("role === 'cdr'");
+    expect(navigation).toContain('>Live</Link>');
   });
 
   it('propose une déconnexion vers la page de connexion', () => {
