@@ -3,9 +3,10 @@
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { cdrLiveTableRows, getTableDisplayNumber } from '@/lib/cdr-live';
+import { cdrLiveTableRows } from '@/lib/cdr-live';
 import { presentTotal, stats } from '@/lib/live';
 import { supabase } from '@/lib/supabase/client';
+import { getTableDisplayNumber } from '@/lib/tables';
 import type { LiveTable, TableVisit } from '@/lib/types';
 
 type NoteDraft = { comment: string; referrer: string };

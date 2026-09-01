@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { presentTotal } from '@/lib/live';
+import { compareTableDisplayNumbers, getTableDisplayNumber } from '@/lib/tables';
 import type { ArrivalDraft, LiveTable } from '@/lib/types';
 
 const MAX_RESULTS = 8;
@@ -15,15 +16,17 @@ export function findTables(tables: LiveTable[], input: string) {
   const numericSearch = /^\d+$/.test(numericQuery);
   return tables
     .filter((table) => {
-      const displayNumber = String(table.display_number ?? '');
+      const displayNumber = getTableDisplayNumber(table);
       const waiter = table.head_waiter ? `${table.head_waiter.first_name} ${table.head_waiter.last_name}`.toLocaleLowerCase('fr-FR') : '';
       if (!numericSearch) return !query.startsWith('table ') && waiter.includes(query);
       return displayNumber.includes(numericQuery) || `table ${displayNumber}`.includes(query);
     })
     .sort((left, right) => {
-      const leftExact = String(left.display_number) === numericQuery ? 0 : 1;
-      const rightExact = String(right.display_number) === numericQuery ? 0 : 1;
-      return leftExact - rightExact || (left.display_number ?? 0) - (right.display_number ?? 0);
+      const leftLabel = getTableDisplayNumber(left);
+      const rightLabel = getTableDisplayNumber(right);
+      const leftExact = leftLabel === numericQuery ? 0 : 1;
+      const rightExact = rightLabel === numericQuery ? 0 : 1;
+      return leftExact - rightExact || compareTableDisplayNumbers(leftLabel, rightLabel);
     });
 }
 
@@ -52,7 +55,7 @@ export function TableSearch({ tables, drafts, onSelect }: { tables: LiveTable[];
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'Escape') { setOpen(false); return; }
     if (event.key === 'Enter') {
-      const exact = results.filter((table) => String(table.display_number) === normaliseQuery(queryInput).replace(/^table\s*/, '').replace(/\s/g, ''));
+      const exact = results.filter((table) => getTableDisplayNumber(table) === normaliseQuery(queryInput).replace(/^table\s*/, '').replace(/\s/g, ''));
       if (exact.length === 1) { event.preventDefault(); choose(exact[0]); }
     }
   }
@@ -77,7 +80,7 @@ export function TableSearch({ tables, drafts, onSelect }: { tables: LiveTable[];
             ? { label: 'Occupée', className: 'border-fuchsia-400/30 bg-fuchsia-500/15 text-fuchsia-200', people: `${totalPeople}/${capacity} pers.` }
             : { label: 'Libre', className: 'border-emerald-400/30 bg-emerald-500/15 text-emerald-200', people: `0/${capacity} pers.` };
         const waiter = table.head_waiter ? `${table.head_waiter.first_name} ${table.head_waiter.last_name}` : 'CDR non attribué';
-        return <button type="button" key={table.id} onClick={() => choose(table)} className="group flex min-h-16 w-full flex-wrap items-center gap-x-4 gap-y-2 border-b border-zinc-800 px-4 py-3 text-left transition hover:bg-zinc-900 focus-visible:bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet-400 sm:flex-nowrap"><div className="min-w-0 flex-1"><b className="block text-base tracking-wide text-white">TABLE {table.display_number}</b><span className="mt-0.5 block truncate text-sm text-zinc-400">{table.zone?.name} · {waiter}</span></div><span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${state.className}`}>{state.label}</span><span className="shrink-0 text-sm font-semibold text-zinc-200">{state.people}</span><span aria-hidden="true" className="ml-auto text-lg text-violet-300/80 transition group-hover:translate-x-0.5">›</span></button>;
+        return <button type="button" key={table.id} onClick={() => choose(table)} className="group flex min-h-16 w-full flex-wrap items-center gap-x-4 gap-y-2 border-b border-zinc-800 px-4 py-3 text-left transition hover:bg-zinc-900 focus-visible:bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet-400 sm:flex-nowrap"><div className="min-w-0 flex-1"><b className="block text-base tracking-wide text-white">TABLE {getTableDisplayNumber(table)}</b><span className="mt-0.5 block truncate text-sm text-zinc-400">{table.zone?.name} · {waiter}</span></div><span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${state.className}`}>{state.label}</span><span className="shrink-0 text-sm font-semibold text-zinc-200">{state.people}</span><span aria-hidden="true" className="ml-auto text-lg text-violet-300/80 transition group-hover:translate-x-0.5">›</span></button>;
       })}
       {remainingResults > 0 && <p className="border-t border-zinc-800 px-4 py-2 text-xs text-zinc-500">{remainingResults} autre{remainingResults !== 1 ? 's' : ''} résultat{remainingResults !== 1 ? 's' : ''}</p>}
     </div>}

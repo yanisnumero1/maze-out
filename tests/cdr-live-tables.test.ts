@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { cdrLiveTableRows, getTableDisplayNumber } from '@/lib/cdr-live';
+import { cdrLiveTableRows } from '@/lib/cdr-live';
+import { getTableDisplayNumber } from '@/lib/tables';
 import type { HeadWaiter, LiveTable, TableVisit, Zone } from '@/lib/types';
 
 const zone: Zone = { id: 'zone-1', name: 'Carré 1', display_order: 1, active: true };

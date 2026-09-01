@@ -24,7 +24,7 @@ describe('vue salle Hôtesse en colonnes', () => {
   it('garde les tables directement cliquables dans leur colonne', () => {
     expect(hostess).toContain('mine.map(tableCard)');
     expect(hostess).toContain('openTable(table)');
-    expect(hostess).toContain('TABLE {table.display_number}');
+    expect(hostess).toContain('display_number: getTableDisplayNumber(table)');
     expect(hostess).toContain('← RETOUR AUX CARRÉS');
   });
 

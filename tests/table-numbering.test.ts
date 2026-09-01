@@ -35,11 +35,11 @@ describe('numérotation opérationnelle des tables', () => {
 
   it('affiche et trie les tables Hôtesse de manière numérique', () => {
     expect(hostess).toContain(".order('display_number')");
-    expect(hostess).toContain('TABLE {table.display_number}');
+    expect(hostess).toContain('display_number: getTableDisplayNumber(table)');
   });
 
   it('affiche la même numérotation dans Administration', () => {
     expect(admin).toContain(".order('display_number')");
-    expect(admin).toContain('Table {table.display_number}');
+    expect(admin).toContain('Table {getTableDisplayNumber(table)}');
   });
 });

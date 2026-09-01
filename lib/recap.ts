@@ -1,4 +1,5 @@
 import type { ClubEntryCount, FloorNote, HeadWaiter, LiveTable, Promoter, TableVisit, TableVisitTransfer, Zone } from './types';
+import { compareTableDisplayNumbers, getTableDisplayNumber } from './tables';
 
 export type ActivitySummary = {
   clients: number;
@@ -62,10 +63,10 @@ export const recapTables = (visits: TableVisit[], tableNumbers: Map<string, numb
       people: chronological.reduce((total, visit) => total + visit.present_people + visit.extra_guests, 0),
       extraGuests: chronological.reduce((total, visit) => total + visit.extra_guests, 0),
     } satisfies RecapTable;
-  }).sort((left, right) => Number(left.tableNumber) - Number(right.tableNumber));
+  }).sort((left, right) => compareTableDisplayNumbers(String(left.tableNumber), String(right.tableNumber)));
 };
 
-export const recapRotations = (tables: RecapTable[]) => [...tables].sort((left, right) => right.sales - left.sales || Number(left.tableNumber) - Number(right.tableNumber));
+export const recapRotations = (tables: RecapTable[]) => [...tables].sort((left, right) => right.sales - left.sales || compareTableDisplayNumbers(String(left.tableNumber), String(right.tableNumber)));
 
 export const totalClubEntryCount = (counts: ClubEntryCount[]) => counts.reduce((total, entry) => total + entry.count, 0);
 export const promoterTotal = (promoters: Promoter[]) => promoters.reduce((total, promoter) => total + promoter.entry_count, 0);
@@ -96,10 +97,16 @@ export type RecapAnalytics = {
 };
 
 const percentage = (value: number, total: number) => total ? Math.round((value / total) * 100) : 0;
-const tableNumber = (table: RecapTable) => Number(table.tableNumber) || Number.MAX_SAFE_INTEGER;
+const compareRecapTableNumbers = (left: RecapTable, right: RecapTable) => compareTableDisplayNumbers(String(left.tableNumber), String(right.tableNumber));
+const recapTableDisplayValue = (table: LiveTable): number | string => {
+  const displayNumber = table.display_number;
+  if (typeof displayNumber === 'number') return displayNumber;
+  if (typeof displayNumber === 'string' && displayNumber.trim().length > 0) return displayNumber;
+  return getTableDisplayNumber(table);
+};
 
 export function recapAnalytics(tables: LiveTable[], visits: TableVisit[], transfers: TableVisitTransfer[], promoters: Promoter[]): RecapAnalytics {
-  const tableRows = recapTables(visits, new Map(tables.map((table) => [table.id, table.display_number ?? table.number])));
+  const tableRows = recapTables(visits, new Map(tables.map((table) => [table.id, recapTableDisplayValue(table)])));
   const totalSales = visits.length;
   const totalPeople = activitySummary(visits, tables.length).clients;
   const distinctTables = tableRows.length;
@@ -120,8 +127,8 @@ export function recapAnalytics(tables: LiveTable[], visits: TableVisit[], transf
     rotations,
     transferredVisits: transfers.length,
     tableRows,
-    topSalesTables: [...tableRows].sort((left, right) => right.sales - left.sales || tableNumber(left) - tableNumber(right)).slice(0, 10),
-    topPeopleTables: [...tableRows].sort((left, right) => right.people - left.people || tableNumber(left) - tableNumber(right)).slice(0, 10),
+    topSalesTables: [...tableRows].sort((left, right) => right.sales - left.sales || compareRecapTableNumbers(left, right)).slice(0, 10),
+    topPeopleTables: [...tableRows].sort((left, right) => right.people - left.people || compareRecapTableNumbers(left, right)).slice(0, 10),
     zones,
     waiters,
     promoters: [...promoters].map((promoter) => ({ id: promoter.id, label: promoter.name, people: promoter.entry_count, share: percentage(promoter.entry_count, totalPromoters) })).sort((left, right) => right.people - left.people || left.label.localeCompare(right.label, 'fr')),

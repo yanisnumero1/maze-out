@@ -7,6 +7,7 @@ import { computedStatus, presentTotal, stats, zoneAvailabilityStatus } from '@/l
 import { actorIdsForResolution, actorProfileMap, formatActorLabel, latestAuditActor } from '@/lib/actors';
 import { supabase } from '@/lib/supabase/client';
 import { TableSearch } from '@/components/table-search';
+import { getTableDisplayNumber } from '@/lib/tables';
 
 type Screen = 'zones' | 'columns';
 
@@ -21,6 +22,7 @@ const tableStyles: Record<TableStatus, { badge: string; label: string }> = {
 
 const normalise = (rows: any[]): LiveTable[] => rows.map((table) => ({
   ...table,
+  display_number: getTableDisplayNumber(table),
   reservation: Array.isArray(table.reservation) ? table.reservation[0] ?? null : table.reservation,
   occupancy: Array.isArray(table.occupancy) ? table.occupancy[0] ?? null : table.occupancy,
 }));
@@ -36,7 +38,7 @@ function Counter({ label, value, max, onChange }: { label: string; value: number
 export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [tables, setTables] = useState(initialTables);
+  const [tables, setTables] = useState<LiveTable[]>(() => initialTables.map((table) => ({ ...table, display_number: getTableDisplayNumber(table) })));
   const [screen, setScreen] = useState<Screen>('zones');
   const [zone, setZone] = useState<Zone | null>(null);
   const [editing, setEditing] = useState<LiveTable | null>(null);
@@ -137,7 +139,7 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     const tableNumber = searchParams.get('table');
     if (!tableNumber) { if (handledTableParam) setHandledTableParam(null); return; }
     if (tables.length === 0 || handledTableParam === tableNumber) return;
-    const requestedTable = tables.find((table) => String(table.display_number) === tableNumber);
+    const requestedTable = tables.find((table) => getTableDisplayNumber(table) === tableNumber);
     setHandledTableParam(tableNumber);
     if (!requestedTable) { setNotice('Table introuvable.'); return; }
     const draft = drafts.find((item) => item.table_id === requestedTable.id);

@@ -11,7 +11,7 @@ const search = file('components/table-search.tsx');
 describe('recherche rapide de table depuis le Live', () => {
   it('recherche par numéro seul ou avec le préfixe Table, en privilégiant la correspondance exacte', () => {
     expect(search).toContain("query.replace(/^table\\s*/, '').replace(/\\s/g, '')");
-    expect(search).toContain('String(left.display_number) === numericQuery');
+    expect(search).toContain('getTableDisplayNumber(left)');
     expect(search).toContain('Rechercher une table...');
   });
 
@@ -25,13 +25,13 @@ describe('recherche rapide de table depuis le Live', () => {
 
   it('navigue vers une table depuis le Live sans créer de brouillon', () => {
     expect(live).toContain("from '@/components/table-search'");
-    expect(live).toContain('router.push(`/hostess?table=${encodeURIComponent(String(table.display_number))}`)');
+    expect(live).toContain('router.push(`/hostess?table=${encodeURIComponent(getTableDisplayNumber(table))}`)');
     expect(search).not.toContain('prepare_arrival_draft');
   });
 
   it('ouvre la table demandée directement dans le bon carré et ouvre son brouillon actif si nécessaire', () => {
     expect(hostess).toContain("searchParams.get('table')");
-    expect(hostess).toContain('String(table.display_number) === tableNumber');
+    expect(hostess).toContain('getTableDisplayNumber(table) === tableNumber');
     expect(hostess).toContain('setZone(requestedTable.zone)');
     expect(hostess).toContain('setEditing(requestedTable)');
     expect(hostess).toContain('router.replace(`/hostess?draft=${encodeURIComponent(draft.id)}`)');
@@ -50,7 +50,7 @@ describe('recherche rapide de table depuis le Live', () => {
     const zoneScreen = hostess.slice(hostess.indexOf("if (screen === 'zones')"));
     expect(zoneScreen).toContain('<TableSearch tables={tables} drafts={drafts}');
     expect(zoneScreen.indexOf('<TableSearch')).toBeLessThan(zoneScreen.indexOf('<section className="grid grid-cols-2'));
-    expect(hostess).toContain('router.replace(`/hostess?table=${encodeURIComponent(String(table.display_number))}`)');
+    expect(hostess).toContain('display_number: getTableDisplayNumber(table)');
   });
 
   it('affiche une ligne opérationnelle avec priorité au brouillon, capacité réelle et résultats limités', () => {

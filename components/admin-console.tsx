@@ -4,9 +4,11 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { LiveTable } from '@/lib/types';
 import { supabase } from '@/lib/supabase/client';
+import { getTableDisplayNumber } from '@/lib/tables';
 
 const normalise = (rows: any[]): LiveTable[] => rows.map((table) => ({
   ...table,
+  display_number: getTableDisplayNumber(table),
   reservation: Array.isArray(table.reservation) ? table.reservation[0] ?? null : table.reservation,
   occupancy: Array.isArray(table.occupancy) ? table.occupancy[0] ?? null : table.occupancy,
 }));
@@ -68,7 +70,7 @@ export function AdminConsole({ tables }: { tables: LiveTable[] }) {
         <table className="w-full min-w-[680px] text-sm">
           <thead className="text-left text-zinc-400"><tr><th>Table</th><th>Zone</th><th>CDR</th><th>Capacité</th><th>État</th></tr></thead>
           <tbody>{rows.map((table) => <tr className="border-t border-zinc-800" key={table.id}>
-            <td><b className="block py-3">Table {table.display_number}</b></td>
+            <td><b className="block py-3">Table {getTableDisplayNumber(table)}</b></td>
             <td><select className="min-h-10 bg-zinc-800 p-2" value={table.zone_id} onChange={(event) => void update(table.id, { zone_id: event.target.value })}>{zones.map((zone) => <option value={zone.id} key={zone.id}>{zone.name}</option>)}</select></td>
             <td><select className="min-h-10 bg-zinc-800 p-2" value={table.head_waiter_id ?? ''} onChange={(event) => void update(table.id, { head_waiter_id: event.target.value || null })}><option value="">Aucun</option>{cdrs.map((cdr) => <option value={cdr.id} key={cdr.id}>{cdr.first_name} {cdr.last_name}</option>)}</select></td>
             <td><input className="min-h-10 w-14 bg-zinc-800 p-2" type="number" value={table.standard_capacity} onChange={(event) => void update(table.id, { standard_capacity: +event.target.value })} /></td>

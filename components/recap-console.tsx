@@ -5,6 +5,7 @@ import { activitySummary, promoterTotal, recapAnalytics, recapRotations, recapTa
 import { recapActivity } from '@/lib/recap-activity';
 import { actorIdsForResolution, actorProfileMap, formatActorLabel } from '@/lib/actors';
 import { supabase } from '@/lib/supabase/client';
+import { getTableDisplayNumber } from '@/lib/tables';
 import { RecapAnalyticsPanel } from '@/components/recap-analytics';
 import type { ClubEntryCount, FloorNote, LiveTable, NightReport, NightReportDelivery, NightSession, OperationalActorProfile, OperationalAuditLog, Promoter, PromoterCountEvent, TableVisit, TableVisitTransfer } from '@/lib/types';
 
@@ -104,7 +105,7 @@ export function RecapConsole() {
   const selectedEntries = useMemo(() => entryCounts.filter((entry) => entry.night_session_id === sessionId), [entryCounts, sessionId]);
   const selectedPromoters = useMemo(() => promoters.filter((promoter) => promoter.night_session_id === sessionId), [promoters, sessionId]);
   const selectedNotes = useMemo(() => selectedNightNotes(notes, sessionId), [notes, sessionId]);
-  const tableNumbers = useMemo(() => new Map(tables.map((table) => [table.id, table.display_number ?? table.number])), [tables]);
+  const tableNumbers = useMemo(() => new Map(tables.map((table) => [table.id, getTableDisplayNumber(table)])), [tables]);
   const global = useMemo(() => activitySummary(visits, tables.filter((table) => table.active).length), [tables, visits]);
   const soldTables = useMemo(() => recapTables(visits, tableNumbers), [visits, tableNumbers]);
   const rotations = useMemo(() => recapRotations(soldTables), [soldTables]);
