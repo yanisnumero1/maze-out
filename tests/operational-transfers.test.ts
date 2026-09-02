@@ -41,7 +41,7 @@ describe('transferts opérationnels et revue terrain', () => {
 
   it('préserve la revente, la recherche dans les carrés et le déplacement de brouillon', () => {
     expect(hostess).toContain("hasPreviousSale ? 'Revendre la table' : 'Préparer l’arrivée'");
-    expect(hostess).toContain('<TableSearch tables={tables} drafts={drafts}');
+    expect(hostess).toContain('<GlobalSearch tables={tables} drafts={drafts} visits={tableVisits}');
     expect(hostess).toContain('table.id !== displayedDraft?.table_id');
     expect(hostess).toContain('presentTotal(table) === 0 && !draft');
   });

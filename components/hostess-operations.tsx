@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { promoterActivitySummaries, promoterArrivalCount } from '@/lib/promoters';
 import { actorIdsForResolution, actorProfileMap, formatActorLabel, latestAuditActor } from '@/lib/actors';
 import type { ClubEntryCount, FloorNote, OperationalActorProfile, OperationalAuditLog, Promoter, PromoterCountEvent } from '@/lib/types';
@@ -13,6 +14,7 @@ const nonNegative = (value: number) => Math.max(0, Number.isFinite(value) ? Math
 const positiveInteger = (value: string) => /^\d+$/.test(value) && Number(value) > 0 ? Number(value) : null;
 
 export function HostessOperations({ view }: { view: OperationView }) {
+  const searchParams = useSearchParams();
   const [notes, setNotes] = useState<FloorNote[]>([]);
   const [promoters, setPromoters] = useState<Promoter[]>([]);
   const [promoterEvents, setPromoterEvents] = useState<PromoterCountEvent[]>([]);
@@ -28,6 +30,12 @@ export function HostessOperations({ view }: { view: OperationView }) {
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
   const [savingActivity, setSavingActivity] = useState(false);
+
+  useEffect(() => {
+    if (view !== 'promoteurs') return;
+    const promoterId = searchParams.get('promoter');
+    if (promoterId && promoters.some((promoter) => promoter.id === promoterId)) setSelectedPromoterId(promoterId);
+  }, [promoters, searchParams, view]);
 
   async function refresh() {
     setLoading(true);

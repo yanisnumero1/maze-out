@@ -7,11 +7,13 @@ const live = file('components/live-dashboard.tsx');
 const hostess = file('components/hostess-console.tsx');
 const navigation = file('components/navigation.tsx');
 const search = file('components/table-search.tsx');
+const globalSearch = file('components/global-search.tsx');
+const searchLogic = file('lib/global-search.ts');
 
 describe('recherche rapide de table depuis le Live', () => {
   it('recherche par numéro seul ou avec le préfixe Table, en privilégiant la correspondance exacte', () => {
-    expect(search).toContain("query.replace(/^table\\s*/, '').replace(/\\s/g, '')");
-    expect(search).toContain('getTableDisplayNumber(left)');
+    expect(searchLogic).toContain("query.replace(/^table\\s*/, '').replace(/\\s/g, '')");
+    expect(searchLogic).toContain('getTableDisplayNumber(left)');
     expect(search).toContain('Rechercher une table...');
   });
 
@@ -24,7 +26,7 @@ describe('recherche rapide de table depuis le Live', () => {
   });
 
   it('navigue vers une table depuis le Live sans créer de brouillon', () => {
-    expect(live).toContain("from '@/components/table-search'");
+    expect(live).toContain("from '@/components/global-search'");
     expect(live).toContain('router.push(`/hostess?table=${encodeURIComponent(getTableDisplayNumber(table))}`)');
     expect(search).not.toContain('prepare_arrival_draft');
   });
@@ -46,10 +48,10 @@ describe('recherche rapide de table depuis le Live', () => {
   });
 
   it('réutilise la même recherche dans la vue Salle Hôtesse avant les cartes des carrés', () => {
-    expect(hostess).toContain("import { TableSearch } from '@/components/table-search'");
+    expect(hostess).toContain("import { GlobalSearch } from '@/components/global-search'");
     const zoneScreen = hostess.slice(hostess.indexOf("if (screen === 'zones')"));
-    expect(zoneScreen).toContain('<TableSearch tables={tables} drafts={drafts}');
-    expect(zoneScreen.indexOf('<TableSearch')).toBeLessThan(zoneScreen.indexOf('<section className="grid grid-cols-2'));
+    expect(zoneScreen).toContain('<GlobalSearch tables={tables} drafts={drafts} visits={tableVisits}');
+    expect(zoneScreen.indexOf('<GlobalSearch')).toBeLessThan(zoneScreen.indexOf('<section className="grid grid-cols-2'));
     expect(hostess).toContain('display_number: getTableDisplayNumber(table)');
   });
 
@@ -64,13 +66,13 @@ describe('recherche rapide de table depuis le Live', () => {
   });
 
   it('reste vide sans saisie, accessible, effaçable et tactile', () => {
-    expect(search).toContain('if (!query) return []');
-    expect(search).toContain('Effacer la recherche');
-    expect(search).toContain('focus:ring-violet-500/30');
-    expect(search).toContain('focus-visible:ring-violet-400');
-    expect(search).toContain('flex-wrap');
-    expect(search).toContain("event.key === 'Escape'");
-    expect(search).toContain("event.key === 'Enter'");
-    expect(search).toContain("document.addEventListener('mousedown'");
+    expect(searchLogic).toContain('if (!query) return []');
+    expect(globalSearch).toContain('Effacer la recherche');
+    expect(globalSearch).toContain('focus:ring-violet-500/30');
+    expect(globalSearch).toContain('focus-visible:ring-violet-400');
+    expect(globalSearch).toContain('max-h-[min(30rem,65dvh)]');
+    expect(globalSearch).toContain("event.key === 'Escape'");
+    expect(globalSearch).toContain("event.key !== 'Enter'");
+    expect(globalSearch).toContain("document.addEventListener('mousedown'");
   });
 });

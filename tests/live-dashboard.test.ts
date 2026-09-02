@@ -55,8 +55,8 @@ describe('dashboard Live opérationnel', () => {
   });
 
   it('conserve les cartes cliquables et les abonnements Realtime existants', () => {
-    expect(dashboardSource).toContain("from '@/components/table-search'");
-    expect(dashboardSource).toContain('<TableSearch tables={tables} drafts={drafts}');
+    expect(dashboardSource).toContain("from '@/components/global-search'");
+    expect(dashboardSource).toContain('<GlobalSearch tables={tables} drafts={drafts} visits={visits}');
     expect(dashboardSource).toContain('Ouvrir la vue salle');
     expect(dashboardSource).toContain('/hostess?zone=');
     expect(dashboardSource).toContain("table: 'occupancies'");

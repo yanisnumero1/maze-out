@@ -2,33 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { presentTotal } from '@/lib/live';
-import { compareTableDisplayNumbers, getTableDisplayNumber } from '@/lib/tables';
+import { getTableDisplayNumber } from '@/lib/tables';
+import { findTables as findTableMatches, normaliseSearchQuery } from '@/lib/global-search';
 import type { ArrivalDraft, LiveTable } from '@/lib/types';
 
 const MAX_RESULTS = 8;
 
-const normaliseQuery = (value: string) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('fr-FR');
-
-export function findTables(tables: LiveTable[], input: string) {
-  const query = normaliseQuery(input);
-  if (!query) return [];
-  const numericQuery = query.replace(/^table\s*/, '').replace(/\s/g, '');
-  const numericSearch = /^\d+$/.test(numericQuery);
-  return tables
-    .filter((table) => {
-      const displayNumber = getTableDisplayNumber(table);
-      const waiter = table.head_waiter ? `${table.head_waiter.first_name} ${table.head_waiter.last_name}`.toLocaleLowerCase('fr-FR') : '';
-      if (!numericSearch) return !query.startsWith('table ') && waiter.includes(query);
-      return displayNumber.includes(numericQuery) || `table ${displayNumber}`.includes(query);
-    })
-    .sort((left, right) => {
-      const leftLabel = getTableDisplayNumber(left);
-      const rightLabel = getTableDisplayNumber(right);
-      const leftExact = leftLabel === numericQuery ? 0 : 1;
-      const rightExact = rightLabel === numericQuery ? 0 : 1;
-      return leftExact - rightExact || compareTableDisplayNumbers(leftLabel, rightLabel);
-    });
-}
+export const findTables = findTableMatches;
 
 export function TableSearch({ tables, drafts, onSelect }: { tables: LiveTable[]; drafts: ArrivalDraft[]; onSelect: (table: LiveTable) => void }) {
   const [queryInput, setQueryInput] = useState('');
@@ -55,7 +35,7 @@ export function TableSearch({ tables, drafts, onSelect }: { tables: LiveTable[];
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'Escape') { setOpen(false); return; }
     if (event.key === 'Enter') {
-      const exact = results.filter((table) => getTableDisplayNumber(table) === normaliseQuery(queryInput).replace(/^table\s*/, '').replace(/\s/g, ''));
+      const exact = results.filter((table) => getTableDisplayNumber(table) === normaliseSearchQuery(queryInput).replace(/^table\s*/, '').replace(/\s/g, ''));
       if (exact.length === 1) { event.preventDefault(); choose(exact[0]); }
     }
   }
