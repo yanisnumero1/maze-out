@@ -15,7 +15,7 @@ describe('fiche table avant le workflow d’arrivée', () => {
   it('propose une installation ou une revente explicite avant de préparer un brouillon', () => {
     expect(hostess).toContain("hasPreviousSale ? 'Nouvelle vente / Nouvelle arrivée' : 'Installer une arrivée'");
     expect(hostess).toContain('onClick={() => setEditingMode(true)}');
-    expect(hostess).toContain("rpc('prepare_arrival_draft'");
+    expect(hostess).toContain("rpc('prepare_arrival_draft_v4'");
   });
 
   it('présente les actions d’une table occupée sans ouvrir immédiatement le formulaire', () => {
@@ -31,7 +31,7 @@ describe('fiche table avant le workflow d’arrivée', () => {
     expect(hostess).toContain("rpc('release_operational_table'");
     expect(hostess).toContain('setEditingMode(true)');
     expect(hostess).toContain('Vente précédente terminée. Préparez la nouvelle arrivée.');
-    expect(hostess).toContain("rpc('prepare_arrival_draft'");
+    expect(hostess).toContain("rpc('prepare_arrival_draft_v4'");
   });
 
   it('affiche au plus deux ventes récentes par carte sans requête par table', () => {
