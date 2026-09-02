@@ -40,7 +40,7 @@ export function RecapConsole() {
     const [{ data: sessionRows, error: sessionError }, { data: tableRows, error: tableError }, { data: visitRows, error: visitError }, { data: entryRows, error: entryError }, { data: promoterRows, error: promoterError }, { data: noteRows, error: noteError }, { data: promoterEventRows, error: promoterEventError }, { data: transferRows, error: transferError }, { data: auditData, error: auditError }, { data: reportRows, error: reportError }, { data: deliveryRows, error: deliveryError }, { data: referrerRows, error: referrerError }] = await Promise.all([
       supabase.from('night_sessions').select('*').order('started_at', { ascending: false }),
       supabase.from('tables').select('*, zone:zones(*), head_waiter:head_waiters(*), reservation:reservations(*), occupancy:occupancies(*)').order('display_number'),
-      supabase.from('table_visits').select('*, zone:zones(*), head_waiter:head_waiters(*)').order('arrived_at'),
+      supabase.from('table_visits').select('*, zone:zones(*), head_waiter:head_waiters!table_visits_head_waiter_id_fkey(*)').order('arrived_at'),
       supabase.from('club_entry_counts').select('*').order('recorded_at', { ascending: false }),
       supabase.from('promoters').select('*').order('name'),
       supabase.from('floor_notes').select('*').order('created_at'),

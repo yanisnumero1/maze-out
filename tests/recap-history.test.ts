@@ -20,6 +20,11 @@ describe('historique des soirées', () => {
     expect(recap).toContain('night_session_id === session.id');
   });
 
+  it('désambiguïse le CDR historique avec la clé étrangère d’origine', () => {
+    expect(recap).toContain(".from('table_visits').select('*, zone:zones(*), head_waiter:head_waiters!table_visits_head_waiter_id_fkey(*)')");
+    expect(recap).not.toContain(".from('table_visits').select('*, zone:zones(*), head_waiter:head_waiters(*)')");
+  });
+
   it('exporte les lignes historiques avec carré, CDR, table et horaires', () => {
     expect(recap).toContain("['date', 'carré', 'CDR', 'table', 'vente', 'personnes', 'invités', 'total', 'arrivée', 'fin']");
     expect(recap).toContain('formatTime(visit.arrived_at)');
