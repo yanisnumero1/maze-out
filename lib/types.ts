@@ -31,9 +31,19 @@ export interface CdrRankRecapSale {
   sale_comment: string | null;
   cdr_comment: string | null;
   business_referrer_name: string | null;
+  proposed_business_referrer_name?: string | null;
   arrived_at: string;
   ended_at: string | null;
   is_read_only: boolean;
+}
+export interface CdrRankStatus {
+  night_session_id: string;
+  night_started_at: string;
+  night_ended_at: string | null;
+  night_status: 'active' | 'closed';
+  validated_at: string | null;
+  is_read_only: boolean;
+  validation_label: 'Rang validé' | 'Non validé avant clôture' | 'À valider';
 }
 export type NightReportStatus = 'pending' | 'processing' | 'sent' | 'partial' | 'failed';
 export interface NightReport { id: string; night_session_id: string; status: NightReportStatus; snapshot: Record<string, unknown>; created_at: string; processing_at: string | null; sent_at: string | null; failed_at: string | null; last_error: string | null }

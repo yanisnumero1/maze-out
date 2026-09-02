@@ -1,2 +1,31 @@
 @tailwind base; @tailwind components; @tailwind utilities;
 :root { color-scheme: dark; } body { @apply bg-zinc-950 text-zinc-100 antialiased; } .panel { @apply rounded-2xl border border-zinc-800 bg-zinc-900/80 shadow-xl; } .metric { @apply text-3xl font-bold tracking-tight; }
+
+@media print {
+  @page { size: A4; margin: 14mm; }
+  :root { color-scheme: light; }
+  body { background: white !important; color: #18181b !important; }
+  body * { visibility: hidden !important; }
+  .cdr-print-report, .cdr-print-report * { visibility: visible !important; }
+  .cdr-print-report { display: block !important; position: absolute; inset: 0; width: 100%; font-family: Arial, sans-serif; font-size: 10pt; line-height: 1.4; }
+  .cdr-print-header { border-bottom: 2px solid #18181b; padding-bottom: 8mm; }
+  .cdr-print-brand { margin: 0; font-size: 9pt; font-weight: 800; letter-spacing: .18em; }
+  .cdr-print-header h1 { margin: 2mm 0 5mm; font-size: 22pt; line-height: 1.1; }
+  .cdr-print-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5mm; }
+  .cdr-print-meta p { margin: 0; }
+  .cdr-print-totals { display: flex; gap: 6mm; margin: 7mm 0; }
+  .cdr-print-totals div { min-width: 32mm; border: 1px solid #d4d4d8; border-radius: 3mm; padding: 3mm 4mm; }
+  .cdr-print-totals b, .cdr-print-totals span { display: block; }
+  .cdr-print-totals b { font-size: 18pt; }
+  .cdr-print-totals span { color: #52525b; }
+  .cdr-print-sales { display: grid; gap: 5mm; }
+  .cdr-print-sale { break-inside: avoid; page-break-inside: avoid; border: 1px solid #d4d4d8; border-radius: 3mm; padding: 5mm; }
+  .cdr-print-sale-title { display: flex; align-items: baseline; justify-content: space-between; gap: 5mm; border-bottom: 1px solid #e4e4e7; padding-bottom: 3mm; }
+  .cdr-print-sale-title h2, .cdr-print-sale-title p { margin: 0; }
+  .cdr-print-sale-title h2 { font-size: 14pt; }
+  .cdr-print-sale dl { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm 7mm; margin: 4mm 0 0; }
+  .cdr-print-sale dl div { min-width: 0; }
+  .cdr-print-sale dt { color: #71717a; font-size: 8pt; font-weight: 700; text-transform: uppercase; }
+  .cdr-print-sale dd { margin: 1mm 0 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .cdr-print-report footer { margin-top: 8mm; border-top: 1px solid #d4d4d8; padding-top: 3mm; color: #71717a; font-size: 8pt; text-align: center; }
+}
