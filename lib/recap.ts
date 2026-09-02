@@ -1,4 +1,4 @@
-import type { ClubEntryCount, FloorNote, HeadWaiter, LiveTable, Promoter, TableVisit, TableVisitTransfer, Zone } from './types';
+import type { BusinessReferrer, ClubEntryCount, FloorNote, HeadWaiter, LiveTable, Promoter, TableVisit, TableVisitTransfer, Zone } from './types';
 import { compareTableDisplayNumbers, getTableDisplayNumber } from './tables';
 
 export type ActivitySummary = {
@@ -114,10 +114,50 @@ export type BusinessReferrerRanking = {
   people: number;
 };
 
+export type AdminSaleDetail = {
+  visitId: string;
+  saleNumber: number | null;
+  originTable: string;
+  finalTable: string;
+  finalHeadWaiterName: string;
+  reservationName: string | null;
+  consumption: string | null;
+  saleComment: string | null;
+  cdrComment: string | null;
+  proposedBusinessReferrerName: string | null;
+  validatedBusinessReferrerName: string | null;
+  arrivedAt: string;
+};
+
 const meaningfulText = (value: string | null | undefined) => {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
 };
+
+export function recapSaleDetails(visits: TableVisit[], tables: LiveTable[], referrers: BusinessReferrer[]): AdminSaleDetail[] {
+  const tableById = new Map(tables.map((table) => [table.id, table]));
+  const waiterById = new Map(tables.flatMap((table) => table.head_waiter ? [[table.head_waiter.id, table.head_waiter] as const] : []));
+  const referrerById = new Map(referrers.map((referrer) => [referrer.id, referrer]));
+  return [...visits].map((visit) => {
+    const origin = tableById.get(visit.table_id);
+    const final = tableById.get(visit.current_table_id ?? visit.table_id);
+    const finalWaiter = visit.final_head_waiter_id ? waiterById.get(visit.final_head_waiter_id) : null;
+    return {
+      visitId: visit.id,
+      saleNumber: visit.sale_number ?? null,
+      originTable: origin ? String(getTableDisplayNumber(origin)) : visit.table_id,
+      finalTable: final ? String(getTableDisplayNumber(final)) : String(visit.current_table_id ?? visit.table_id),
+      finalHeadWaiterName: finalWaiter ? `${finalWaiter.first_name} ${finalWaiter.last_name}`.trim() : (visit.head_waiter ? `${visit.head_waiter.first_name} ${visit.head_waiter.last_name}`.trim() : '—'),
+      reservationName: meaningfulText(visit.reservation_name),
+      consumption: meaningfulText(visit.consumption),
+      saleComment: meaningfulText(visit.sale_comment),
+      cdrComment: meaningfulText(visit.cdr_comment),
+      proposedBusinessReferrerName: meaningfulText(visit.proposed_business_referrer_name),
+      validatedBusinessReferrerName: visit.business_referrer_id ? referrerById.get(visit.business_referrer_id)?.name ?? null : null,
+      arrivedAt: visit.arrived_at,
+    };
+  }).sort((left, right) => new Date(right.arrivedAt).getTime() - new Date(left.arrivedAt).getTime() || (right.saleNumber ?? 0) - (left.saleNumber ?? 0));
+}
 
 export function cdrVisitNotes(visits: TableVisit[], tableNumbers: Map<string, number | string>): CdrVisitNote[] {
   return visits

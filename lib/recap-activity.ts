@@ -26,6 +26,7 @@ const number = (value: unknown) => typeof value === 'number' ? value : null;
 function auditActivity(audit: OperationalAuditLog, input: ActivityInput): RecapActivity | null {
   const table = (id: string | null | undefined) => `Table ${input.tableNumbers.get(id ?? '') ?? '—'}`;
   const visit = input.visits.find((row) => row.id === audit.entity_id);
+  const visitTableId = visit?.current_table_id ?? visit?.table_id ?? text(audit.metadata?.current_table_id);
   const transfer = input.transfers.find((row) => row.table_visit_id === audit.entity_id);
   const promoterId = text(auditValue(audit, 'promoter_id'));
   const promoter = input.promoters.find((row) => row.id === promoterId);
@@ -38,6 +39,9 @@ function auditActivity(audit: OperationalAuditLog, input: ActivityInput): RecapA
     case 'table.arrival_confirmed': return { ...common, title: `${table(audit.entity_id)} · Arrivée installée` };
     case 'table.sale_ended': return { ...common, title: `${table(audit.entity_id ?? visit?.current_table_id ?? visit?.table_id)} · Vente terminée` };
     case 'table.transferred': return { ...common, title: `${table(transfer?.from_table_id)} → ${table(transfer?.to_table_id)} · Transfert de table` };
+    case 'hostess.visit.v4_updated': return { ...common, title: `${table(visitTableId)} · Informations de vente modifiées` };
+    case 'cdr.business_referrer.validated': return { ...common, title: `${table(visitTableId)} · Apporteur validé` };
+    case 'cdr.business_referrer.corrected': return { ...common, title: `${table(visitTableId)} · Apporteur corrigé` };
     case 'promoter.activity_added': return { ...common, title: `Promoteur ${promoter?.name ?? '—'} · +${people ?? 0} personnes`, detail: text(auditValue(audit, 'note')) };
     case 'promoter.activity_updated': return { ...common, title: `Promoteur ${promoter?.name ?? '—'} · activité corrigée`, detail: text(auditValue(audit, 'note')) };
     case 'promoter.activity_deleted': return { ...common, title: `Promoteur ${promoter?.name ?? '—'} · activité supprimée` };
