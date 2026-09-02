@@ -29,6 +29,7 @@ export interface CdrRankRecapSale {
   reservation_name: string | null;
   consumption: string | null;
   sale_comment: string | null;
+  cdr_comment: string | null;
   business_referrer_name: string | null;
   arrived_at: string;
   ended_at: string | null;
