@@ -5,14 +5,14 @@ import { describe, expect, it } from 'vitest';
 const hostess = readFileSync(resolve(process.cwd(), 'components/hostess-console.tsx'), 'utf8');
 const live = readFileSync(resolve(process.cwd(), 'components/live-dashboard.tsx'), 'utf8');
 
-describe('vue salle Hôtesse en colonnes', () => {
-  it('affiche les CDR du carré directement en colonnes', () => {
-    expect(hostess).toContain("type Screen = 'zones' | 'columns'");
-    expect(hostess).toContain("xl:grid-cols-3");
-    expect(hostess).toContain("md:grid-cols-2");
-    expect(hostess).toContain('waiters.map((item)');
-    expect(hostess).toContain("waiters.length === 2 ? 'grid gap-4 md:grid-cols-2'");
-    expect(hostess).toContain("'grid gap-4 md:grid-cols-2 xl:grid-cols-3'");
+describe('vue salle Hôtesse par CDR', () => {
+  it('affiche une grille de CDR avant leurs tables', () => {
+    expect(hostess).toContain("type Screen = 'zones' | 'waiters' | 'columns'");
+    expect(hostess).toContain("if (screen === 'waiters')");
+    expect(hostess).toContain('cdrRanks.map((rank)');
+    expect(hostess).toContain('min-[420px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4');
+    const waiterScreen = hostess.slice(hostess.indexOf("if (screen === 'waiters')"), hostess.indexOf("if (screen === 'columns'"));
+    expect(waiterScreen).not.toContain('.map(tableCard)');
   });
 
   it('charge les affectations depuis Supabase au lieu de les coder en dur', () => {
@@ -21,11 +21,11 @@ describe('vue salle Hôtesse en colonnes', () => {
     expect(hostess).not.toContain("Samir : tables");
   });
 
-  it('garde les tables directement cliquables dans leur colonne', () => {
-    expect(hostess).toContain('mine.map(tableCard)');
+  it('garde les tables directement cliquables après sélection du CDR', () => {
+    expect(hostess).toContain('selectedRank.tables.map(tableCard)');
     expect(hostess).toContain('openTable(table)');
     expect(hostess).toContain('display_number: getTableDisplayNumber(table)');
-    expect(hostess).toContain('← RETOUR AUX CARRÉS');
+    expect(hostess).toContain('← TOUS LES CDR DE');
   });
 
   it('nomme simplement l’écran opérationnel Arrivée', () => {
@@ -46,6 +46,12 @@ describe('vue salle Hôtesse en colonnes', () => {
     expect(hostess).toContain('Tables utilisées : {zoneSummary.occupied} / {inZone.length}');
     expect(hostess).toContain('Capacité zone : {zoneSummary.present} / {zone.max_capacity}');
     expect(hostess).toContain('zoneAvailabilityStatus(zoneSummary.present, zone?.max_capacity, zoneSummary.available)');
+  });
+
+  it('présente les compteurs live de chaque rang, y compris à zéro', () => {
+    expect(hostess).toContain('{rank.occupiedTables} table');
+    expect(hostess).toContain('{rank.presentPeople}');
+    expect(hostess).toContain('hostessCdrRanks(inZone)');
   });
 
   it('conserve brouillons, ventes et déplacement sécurisé', () => {
