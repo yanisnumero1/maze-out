@@ -17,6 +17,23 @@ export interface Promoter { id: string; night_session_id: string; name: string; 
 export interface PromoterCountEvent { id: string; promoter_id: string; night_session_id: string; previous_count: number; next_count: number; people_added: number | null; note: string | null; changed_by: string | null; created_at: string }
 export interface OperationalActorProfile { id: string; first_name: string | null; last_name: string | null; role: Role }
 export interface OperationalAuditLog { id: string; night_session_id: string; actor_id: string; action_type: string; entity_type: string; entity_id: string | null; created_at: string; before_data: Record<string, unknown> | null; after_data: Record<string, unknown> | null; metadata: Record<string, unknown> | null }
+export interface CdrRankRecapSale {
+  table_visit_id: string;
+  night_session_id: string;
+  night_started_at: string;
+  night_ended_at: string | null;
+  night_status: 'active' | 'closed';
+  source_table_number: string | null;
+  final_table_number: string | null;
+  sale_number: number | null;
+  reservation_name: string | null;
+  consumption: string | null;
+  sale_comment: string | null;
+  business_referrer_name: string | null;
+  arrived_at: string;
+  ended_at: string | null;
+  is_read_only: boolean;
+}
 export type NightReportStatus = 'pending' | 'processing' | 'sent' | 'partial' | 'failed';
 export interface NightReport { id: string; night_session_id: string; status: NightReportStatus; snapshot: Record<string, unknown>; created_at: string; processing_at: string | null; sent_at: string | null; failed_at: string | null; last_error: string | null }
 export interface NightReportDelivery { id: string; night_report_id: string; report_recipient_id: string; status: 'pending' | 'processing' | 'sent' | 'failed'; attempt_count: number; next_attempt_at: string | null; processing_at: string | null; sent_at: string | null; failed_at: string | null; last_error: string | null; provider_message_id: string | null; created_at: string; updated_at: string }

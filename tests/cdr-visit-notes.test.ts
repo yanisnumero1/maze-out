@@ -41,9 +41,9 @@ describe('notes et apporteur CDR sur une visite active', () => {
 
   it('affiche les champs seulement pour une visite active et sauvegarde via la RPC', () => {
     expect(consoleSource).toContain("supabase.from('table_visits').select('*').is('ended_at', null)");
-    expect(consoleSource).toContain('{visit && draft &&');
+    expect(consoleSource).toContain('{visit && noteDraft &&');
     expect(consoleSource).toContain('Commentaire');
-    expect(consoleSource).toContain('Apporteur d’affaires');
+    expect(consoleSource).toContain('Apporteur historique');
     expect(consoleSource).toContain("rpc('update_cdr_visit_notes'");
     expect(consoleSource).toContain('Enregistrement...');
     expect(consoleSource).toContain('Enregistré');
