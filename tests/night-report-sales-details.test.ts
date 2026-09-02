@@ -28,7 +28,7 @@ describe('V4 — détail des ventes dans le rapport de nuit figé', () => {
   });
 
   it('rend le bloc email uniquement depuis snapshot.sales_details et reste compatible avec les anciens snapshots', () => {
-    expect(worker).toContain('const salesDetails = Array.isArray(snapshot.sales_details) ? snapshot.sales_details : [];');
+    expect(worker).toContain('const salesDetails = humanSalesDetails(Array.isArray(snapshot.sales_details) ? snapshot.sales_details : []);');
     expect(worker).toContain("${sales ? `<h2>DÉTAIL DES VENTES</h2>${sales}` : ''}");
     expect(worker).toContain("sale.business_referrer_name ? `Apporteur :");
     expect(worker).toContain("sale.proposed_business_referrer_name ? `Proposé :");

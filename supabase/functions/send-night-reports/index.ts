@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { humanSalesDetails, humanTopTables, officialReferrersFromSales } from './report-data.ts';
 
 type ClaimedDelivery = { delivery_id: string; night_report_id: string; recipient_name: string | null; recipient_email: string; snapshot: Record<string, any> };
 
@@ -37,16 +38,19 @@ function reportEmail(snapshot: Record<string, any>) {
   const duration = night.started_at && night.ended_at ? `${formatTime(night.started_at)} → ${formatTime(night.ended_at)}` : '—';
   const zonesData = performance.zones ?? snapshot.zones ?? [];
   const waitersData = performance.head_waiters ?? snapshot.head_waiters ?? [];
-  const topTables = snapshot.top_tables ?? [];
+  const salesDetails = humanSalesDetails(Array.isArray(snapshot.sales_details) ? snapshot.sales_details : []);
+  const topTables = humanTopTables(snapshot.top_tables ?? [], salesDetails);
   const promotersData = snapshot.promoters_ranked ?? snapshot.promoters ?? [];
-  const businessReferrers = snapshot.business_referrers_ranked ?? [];
+  const frozenBusinessReferrers = snapshot.business_referrers_ranked ?? [];
+  const v4BusinessReferrers = officialReferrersFromSales(salesDetails);
+  const v4Names = new Set(v4BusinessReferrers.map((referrer) => referrer.normalized_name));
+  const businessReferrers = [...v4BusinessReferrers, ...frozenBusinessReferrers.filter((referrer: any) => !v4Names.has(String(referrer.normalized_name ?? referrer.name ?? '').trim().toLocaleLowerCase('fr-FR')))];
   const cdrVisitNotes = snapshot.cdr_visit_notes ?? [];
-  const salesDetails = Array.isArray(snapshot.sales_details) ? snapshot.sales_details : [];
   const zones = bars(zonesData, (zone) => Number(zone.total_sales ?? 0), (zone) => `${zone.name} — ${zone.total_sales ?? 0} ventes · ${zone.people_welcomed ?? 0} personnes`);
   const waiters = bars(waitersData, (waiter) => Number(waiter.total_sales ?? 0), (waiter, index) => `${index < 3 ? `#${index + 1} · ` : ''}${waiter.name} — ${waiter.total_sales ?? 0} ventes · ${waiter.people_welcomed ?? 0} personnes`);
   const tables = bars(topTables, (table) => Number(table.total_sales ?? 0), (table) => `Table ${table.table_number} — ${table.total_sales} ventes · ${table.people_welcomed} personnes`);
   const promoters = rows(promotersData, (promoter) => `${escape(promoter.name)} — ${escape(promoter.people_welcomed)} personnes`);
-  const referrers = rows(businessReferrers, (referrer) => `${escape(referrer.name)} — ${escape(referrer.total_sales)} vente${Number(referrer.total_sales) !== 1 ? 's' : ''} · ${escape(referrer.people_welcomed)} personnes`);
+  const referrers = rows(businessReferrers, (referrer) => `${escape(referrer.name)} — ${escape(referrer.total_sales)} vente${Number(referrer.total_sales) !== 1 ? 's' : ''}${referrer.people_welcomed === null || referrer.people_welcomed === undefined ? '' : ` · ${escape(referrer.people_welcomed)} personnes`}`);
   const cdrNotes = rows(cdrVisitNotes, (visit) => `Table ${escape(visit.table_number)} · Vente #${escape(visit.sale_number ?? '—')}<br><small>CDR : ${escape(visit.head_waiter_name ?? '—')} · ${escape(visit.people_welcomed)} personnes${visit.business_referrer ? ` · Apporteur : ${escape(visit.business_referrer)}` : ''}</small>${visit.cdr_comment ? `<br>${escape(visit.cdr_comment)}` : ''}`);
   const sales = salesDetails.length ? `<div>${salesDetails.map((sale: Record<string, any>) => {
     const origin = sale.origin_table_number ?? '—';
