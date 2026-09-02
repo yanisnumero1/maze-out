@@ -27,6 +27,7 @@ const normalise = (rows: any[]): LiveTable[] => rows.map((table) => ({
   occupancy: Array.isArray(table.occupancy) ? table.occupancy[0] ?? null : table.occupancy,
 }));
 const clamp = (value: number, max: number) => Math.max(0, Math.min(max, Number.isFinite(value) ? value : 0));
+const displaySaleValue = (value?: string | null) => value?.trim() ? value : '—';
 
 function Counter({ label, value, max, onChange }: { label: string; value: number; max: number; onChange: (value: number) => void }) {
   const [input, setInput] = useState(String(value));
@@ -95,6 +96,23 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
   const actors = useMemo(() => actorProfileMap(actorProfiles), [actorProfiles]);
   const auditActor = (entityType: string, entityId: string, actionTypes?: string[]) => latestAuditActor(auditRows, entityType, entityId, actionTypes);
 
+  function hydrateConfirmedSale(table: LiveTable) {
+    const activeVisit = (visitsByTable[table.id] ?? []).find((visit) => !visit.ended_at) ?? null;
+    setReservationName(activeVisit?.reservation_name ?? '');
+    setConsumption(activeVisit?.consumption ?? '');
+    setSaleComment(activeVisit?.sale_comment ?? '');
+    setProposedBusinessReferrerName(activeVisit?.proposed_business_referrer_name ?? '');
+  }
+
+  function confirmedSaleFieldsChanged(table: LiveTable) {
+    const activeVisit = (visitsByTable[table.id] ?? []).find((visit) => !visit.ended_at);
+    if (!activeVisit) return false;
+    return reservationName !== (activeVisit.reservation_name ?? '')
+      || consumption !== (activeVisit.consumption ?? '')
+      || saleComment !== (activeVisit.sale_comment ?? '')
+      || proposedBusinessReferrerName !== (activeVisit.proposed_business_referrer_name ?? '');
+  }
+
   async function refresh() {
     const [{ data: tableRows, error: tablesError }, { data: draftRows, error: draftsError }, { data: userData }, { data: nightId, error: nightError }, { data: referrerRows, error: referrersError }] = await Promise.all([
       supabase.from('tables').select('*, zone:zones(*), head_waiter:head_waiters(*), reservation:reservations(*), occupancy:occupancies(*)').eq('active', true).order('display_number'),
@@ -158,15 +176,20 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     setPresent(clamp(requestedTable.occupancy?.present_people ?? 0, requestedTable.max_people ?? requestedTable.standard_capacity));
     setExtras(clamp(requestedTable.occupancy?.extra_guests ?? 0, requestedTable.max_extra_guests ?? 0));
     setComment(requestedTable.occupancy?.comment ?? '');
-    setReservationName(''); setConsumption(''); setSaleComment(''); setProposedBusinessReferrerName('');
+    hydrateConfirmedSale(requestedTable);
     setEditing(requestedTable);
     setEditingMode(false);
     setNotice('');
-  }, [drafts, handledTableParam, router, searchParams, tables]);
+  }, [drafts, handledTableParam, router, searchParams, tables, visitsByTable]);
 
   useEffect(() => {
     if (editing && displayedDraft) setEditingMode(true);
   }, [displayedDraft, editing]);
+
+  useEffect(() => {
+    if (!editing || editingMode) return;
+    hydrateConfirmedSale(editing);
+  }, [editing?.id, editingMode, visitsByTable]);
 
   function openTable(table: LiveTable) {
     const draft = drafts.find((item) => item.table_id === table.id);
@@ -179,7 +202,7 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     setPresent(clamp(table.occupancy?.present_people ?? 0, maxPeople));
     setExtras(clamp(table.occupancy?.extra_guests ?? 0, maxGuests));
     setComment(table.occupancy?.comment ?? '');
-    setReservationName(''); setConsumption(''); setSaleComment(''); setProposedBusinessReferrerName('');
+    hydrateConfirmedSale(table);
     setNotice('');
   }
 
@@ -274,12 +297,27 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
   async function saveExistingOccupation() {
     if (!editing) return;
     if (present + extras < 1) return setNotice('Le nombre de personnes doit être au moins égal à 1.');
+    const activeVisit = (visitsByTable[editing.id] ?? []).find((visit) => !visit.ended_at) ?? null;
+    const v4FieldsChanged = confirmedSaleFieldsChanged(editing);
+    if (v4FieldsChanged && !activeVisit) return setNotice('La vente active est introuvable. Actualisez avant de modifier les informations de vente.');
     const maxPeople = editing.max_people ?? editing.standard_capacity;
     const maxGuests = editing.max_extra_guests ?? 0;
     const payload = { table_id: editing.id, present_people: clamp(present, maxPeople), extra_guests: clamp(extras, maxGuests), comment: comment || null, arrived_at: new Date().toISOString() };
     const { error } = await supabase.from('occupancies').upsert(payload);
     if (error) return setNotice(error.message);
-    setEditing(null); await refresh();
+    if (v4FieldsChanged && activeVisit) {
+      const { error: visitError } = await supabase.rpc('update_hostess_visit_v4_fields', {
+        p_visit_id: activeVisit.id,
+        p_reservation_name: reservationName || null,
+        p_consumption: consumption || null,
+        p_sale_comment: saleComment || null,
+        p_proposed_business_referrer_name: proposedBusinessReferrerName || null,
+      });
+      if (visitError) return setNotice(visitError.message);
+    }
+    await refresh();
+    setEditingMode(false);
+    setNotice('Vente mise à jour.');
   }
 
   const openZone = (item: Zone) => { setZone(item); setScreen('columns'); setNotice(''); };
@@ -315,6 +353,7 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     const visitsForTable = tableVisits.filter((visit) => visit.table_id === editing.id || visit.current_table_id === editing.id);
     const hasPreviousSale = visitsForTable.some((visit) => visit.ended_at);
     const activeVisit = visitsForTable.find((visit) => !visit.ended_at) ?? null;
+    const validatedReferrer = activeVisit?.business_referrer_id ? businessReferrers.find((referrer) => referrer.id === activeVisit.business_referrer_id) : null;
     const activeVisitActor = activeVisit ? auditActor('table', activeVisit.current_table_id ?? activeVisit.table_id, ['table.arrival_confirmed']) : null;
     const badge = draft ? { label: 'ARRIVÉE EN ATTENTE', className: 'bg-orange-500/15 text-orange-200' } : occupied ? { label: 'OCCUPÉE', className: 'bg-fuchsia-500/15 text-fuchsia-200' } : { label: 'LIBRE', className: 'bg-emerald-500/15 text-emerald-200' };
     return <>
@@ -323,7 +362,7 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
         <h1 className="text-3xl font-black">TABLE {editing.display_number}</h1>
         <p className="mt-2 text-sm text-zinc-400">{editing.zone.name} · {editing.head_waiter ? `${editing.head_waiter.first_name} ${editing.head_waiter.last_name}` : 'CDR non attribué'}</p>
         <span className={`mt-4 inline-flex rounded-full px-3 py-1 text-xs font-bold ${badge.className}`}>{badge.label}</span>
-        {occupied && <section className="mt-5 rounded-xl bg-zinc-800 p-4"><h2 className="font-bold">Vente actuelle</h2><p className="mt-2 text-sm text-zinc-300">{presentTotal(editing)} personnes · Vente #{activeSales[editing.id] ?? '—'}</p>{activeVisitActor && <p className="mt-1 text-xs text-zinc-500">Installée par {formatActorLabel(actors.get(activeVisitActor))}</p>}{editing.occupancy?.comment && <p className="mt-1 text-sm text-zinc-400">{editing.occupancy.comment}</p>}</section>}
+        {occupied && <section className="mt-5 rounded-xl bg-zinc-800 p-4"><h2 className="font-bold">Vente actuelle</h2><p className="mt-2 text-sm text-zinc-300">{presentTotal(editing)} personnes · Vente #{activeSales[editing.id] ?? '—'}</p>{activeVisitActor && <p className="mt-1 text-xs text-zinc-500">Installée par {formatActorLabel(actors.get(activeVisitActor))}</p>}<div className="mt-3 grid gap-1 text-sm text-zinc-300"><p><span className="text-zinc-500">Réservation · </span>{displaySaleValue(activeVisit?.reservation_name)}</p><p><span className="text-zinc-500">Conso · </span>{displaySaleValue(activeVisit?.consumption)}</p><p><span className="text-zinc-500">Commentaire · </span>{displaySaleValue(activeVisit?.sale_comment)}</p><p><span className="text-zinc-500">Apporteur proposé · </span>{displaySaleValue(activeVisit?.proposed_business_referrer_name)}</p><p><span className="text-zinc-500">Apporteur validé · </span>{activeVisit?.business_referrer_id ? validatedReferrer?.name ?? 'Indisponible' : '—'}</p></div>{editing.occupancy?.comment && <p className="mt-3 text-sm text-zinc-400">{editing.occupancy.comment}</p>}</section>}
         <section className="mt-6">
           <h2 className="text-lg font-bold">Historique de la soirée</h2>
           {visitsForTable.length ? <div className="mt-3 grid gap-3">{visitsForTable.map((visit) => <article className="rounded-xl bg-zinc-800 p-3" key={visit.id}><b>Vente #{visit.sale_number ?? '—'}</b><p className="mt-1 text-sm text-zinc-300">{visit.present_people} personnes{visit.extra_guests ? ` · ${visit.extra_guests} invités` : ''} · {new Date(visit.arrived_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} → {visit.ended_at ? new Date(visit.ended_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'en cours'} · {visit.ended_at ? 'Terminée' : 'En cours'}</p>{visit.comment && <p className="mt-1 text-sm text-zinc-400">{visit.comment}</p>}{transfers.filter((transfer) => transfer.table_visit_id === visit.id).map((transfer) => <p className="mt-2 text-xs text-violet-200" key={transfer.id}>Transfert : Table {tables.find((table) => table.id === transfer.from_table_id)?.display_number} → Table {tables.find((table) => table.id === transfer.to_table_id)?.display_number}</p>)}</article>)}</div> : <p className="mt-2 text-sm text-zinc-400">Aucune vente cette soirée.</p>}
