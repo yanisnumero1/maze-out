@@ -108,15 +108,17 @@ describe('dashboard Live opérationnel', () => {
     expect(hostessHubSource).toContain("setView('salle')");
   });
 
-  it('priorise les KPI et les carrés, puis limite l’activité à trois éléments par défaut', () => {
+  it('priorise les actions et la recherche avant les KPI, puis limite l’activité à trois éléments par défaut', () => {
     const kpis = dashboardSource.indexOf('aria-label="Indicateurs Live"');
     const squares = dashboardSource.indexOf('aria-label="État des carrés"');
     const actions = dashboardSource.indexOf('aria-label="Actions rapides"');
+    const search = dashboardSource.indexOf('<GlobalSearch tables={tables}');
     const activity = dashboardSource.indexOf('aria-label="Activité récente"');
-    expect(kpis).toBeGreaterThan(-1);
+    expect(actions).toBeGreaterThan(-1);
+    expect(search).toBeGreaterThan(actions);
+    expect(kpis).toBeGreaterThan(search);
     expect(squares).toBeGreaterThan(kpis);
-    expect(actions).toBeGreaterThan(squares);
-    expect(activity).toBeGreaterThan(actions);
+    expect(activity).toBeGreaterThan(squares);
     expect(dashboardSource).toContain('visibleActivities.slice(0, 3)');
     expect(dashboardSource).toContain("showAllActivity ? 'Réduire' : 'Voir plus'");
     expect(dashboardSource).not.toContain('État de la salle');
