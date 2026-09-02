@@ -18,7 +18,8 @@ describe('passe responsive des interfaces opérationnelles', () => {
 
   it('garde les actions et les cartes Live lisibles sur petits écrans', () => {
     const dashboard = source('components/live-dashboard.tsx');
-    expect(dashboard).toContain('w-full min-w-0 text-left sm:w-auto');
+    expect(dashboard).toContain('grid grid-cols-3 gap-2');
+    expect(dashboard).toContain('grid gap-3 sm:grid-cols-2');
     expect(dashboard).toContain('grid grid-cols-2 gap-2 sm:grid-cols-4');
     expect(dashboard).toContain('flex flex-wrap gap-2');
     expect(dashboard).toContain('min-w-0');

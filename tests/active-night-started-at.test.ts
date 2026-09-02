@@ -20,10 +20,10 @@ describe('heure de début de la soirée active', () => {
     expect(migration).toContain('grant execute on function public.current_operational_night_started_at() to authenticated');
   });
 
-  it('affiche une heure fixe HH:mm ou aucune soirée, indépendamment du changement de date', () => {
-    expect(dashboard).toContain("hour: '2-digit', minute: '2-digit', hour12: false");
-    expect(dashboard).toContain('Soirée démarrée à ${formatStartedAt(nightStartedAt)}');
+  it('affiche la durée écoulée HH:mm ou aucune soirée, indépendamment du changement de date', () => {
+    expect(dashboard).toContain('formatNightElapsed(nightStartedAt, now)');
+    expect(dashboard).toContain('String(Math.floor(minutes / 60)).padStart');
+    expect(dashboard).toContain('Soirée en cours · ${formatNightElapsed(nightStartedAt, now)}');
     expect(dashboard).toContain('Aucune soirée active');
-    expect(dashboard).toContain("second: '2-digit'");
   });
 });

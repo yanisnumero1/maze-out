@@ -51,7 +51,7 @@ describe('dashboard Live opérationnel', () => {
     expect(dashboardSource).toContain('window.clearInterval(clockInterval)');
     const clockEffect = dashboardSource.slice(dashboardSource.indexOf('useEffect(() => {\n    setNow'), dashboardSource.indexOf('useEffect(() => {\n    let active'));
     expect(clockEffect).not.toContain('supabase');
-    expect(dashboardSource).toContain("second: '2-digit'");
+    expect(dashboardSource).toContain('formatNightElapsed');
   });
 
   it('conserve les cartes cliquables et les abonnements Realtime existants', () => {
@@ -70,13 +70,14 @@ describe('dashboard Live opérationnel', () => {
     expect(liveActivity([visit('v2', '2', '2026-08-30T01:10:00Z')], [], [], 1)).toHaveLength(1);
   });
 
-  it('signale les alertes réellement utiles et affiche rien à signaler lorsque la liste est vide', () => {
+  it('signale les alertes réellement utiles et masque le bloc lorsque la liste est vide', () => {
     const crowded = { ...zoneA, max_capacity: 10 };
     const alerts = liveDashboardAlerts([table('1', crowded, 9)], [crowded], [{ ...draft('1', 2), created_at: '2026-08-30T01:00:00Z' }], [transfer('t1', 'v', '1', '2', '2026-08-30T01:01:00Z'), transfer('t2', 'v', '2', '3', '2026-08-30T01:02:00Z')], new Date('2026-08-30T01:11:00Z'));
     expect(alerts.some((alert) => alert.label.includes('90 %'))).toBe(true);
     expect(alerts.some((alert) => alert.label.includes('11 min'))).toBe(true);
     expect(liveDashboardAlerts([table('2', zoneB), table('3', zoneB), table('4', zoneB)], [zoneB], [], [], new Date()).length).toBe(0);
-    expect(dashboardSource).toContain('Rien à signaler');
+    expect(dashboardSource).toContain('{alerts.length > 0 &&');
+    expect(dashboardSource).not.toContain('Rien à signaler');
   });
 
   it('calcule les arrivées récentes dans le carré de localisation actuelle', () => {
@@ -101,9 +102,23 @@ describe('dashboard Live opérationnel', () => {
     expect(dashboardSource).toContain("table: 'table_visit_transfers'");
     expect(dashboardSource).toContain("rpc('current_operational_night_started_at')");
     expect(dashboardSource).toContain("'Aucune soirée active'");
-    expect(dashboardSource).toContain('formatStartedAt');
-    expect(dashboardSource).toContain('Soirée démarrée à');
+    expect(dashboardSource).toContain('formatNightElapsed(nightStartedAt, now)');
+    expect(dashboardSource).toContain('Soirée en cours ·');
     expect(hostessHubSource).toContain("searchParams.get('view')");
     expect(hostessHubSource).toContain("setView('salle')");
+  });
+
+  it('priorise les KPI et les carrés, puis limite l’activité à trois éléments par défaut', () => {
+    const kpis = dashboardSource.indexOf('aria-label="Indicateurs Live"');
+    const squares = dashboardSource.indexOf('aria-label="État des carrés"');
+    const actions = dashboardSource.indexOf('aria-label="Actions rapides"');
+    const activity = dashboardSource.indexOf('aria-label="Activité récente"');
+    expect(kpis).toBeGreaterThan(-1);
+    expect(squares).toBeGreaterThan(kpis);
+    expect(actions).toBeGreaterThan(squares);
+    expect(activity).toBeGreaterThan(actions);
+    expect(dashboardSource).toContain('visibleActivities.slice(0, 3)');
+    expect(dashboardSource).toContain("showAllActivity ? 'Réduire' : 'Voir plus'");
+    expect(dashboardSource).not.toContain('État de la salle');
   });
 });
