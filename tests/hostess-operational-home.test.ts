@@ -71,8 +71,8 @@ describe('accueil opérationnel Hôtesse par rôle', () => {
   });
 
   it('reste responsive et conserve une seule subscription par flux', () => {
-    expect(hostess).toContain('grid grid-cols-1 gap-4 lg:grid-cols-2');
-    expect(hostess).toContain('min-[520px]:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2');
+    expect(hostess).toContain('grid grid-cols-1 gap-3 md:grid-cols-2 sm:gap-4');
+    expect(hostess).toContain('grid grid-cols-1 gap-2.5 xl:grid-cols-2');
     expect(hostess.match(/supabase\.channel\('hostess-live'\)/g)).toHaveLength(1);
   });
 

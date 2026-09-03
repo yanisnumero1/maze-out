@@ -68,7 +68,7 @@ describe('vue salle Hôtesse par CDR', () => {
     expect(hostess).toContain('aria-label={`Table ${getTableDisplayNumber(table)} — ${state}`}');
     expect(hostess).toContain('title={`Table ${getTableDisplayNumber(table)} — ${state}`}');
     expect(hostess).toContain('onClick={() => onOpenRank(rank.headWaiter.id)}');
-    expect(hostess).toContain('mt-4 flex flex-wrap gap-2');
+    expect(hostess).toContain('mt-3 flex flex-wrap gap-1.5 sm:gap-2');
   });
 
   it('ouvre directement une mini-table sans déclencher le clic de la carte CDR', () => {

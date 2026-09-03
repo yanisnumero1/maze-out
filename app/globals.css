@@ -1,6 +1,22 @@
 @tailwind base; @tailwind components; @tailwind utilities;
 :root { color-scheme: dark; } body { @apply bg-zinc-950 text-zinc-100 antialiased; } .panel { @apply rounded-2xl border border-zinc-800 bg-zinc-900/80 shadow-xl; } .metric { @apply text-3xl font-bold tracking-tight; }
 
+.app-shell {
+  padding-top: max(.75rem, env(safe-area-inset-top));
+  padding-right: max(.75rem, env(safe-area-inset-right));
+  padding-bottom: max(.75rem, env(safe-area-inset-bottom));
+  padding-left: max(.75rem, env(safe-area-inset-left));
+}
+
+@media (min-width: 640px) {
+  .app-shell {
+    padding-top: max(1.5rem, env(safe-area-inset-top));
+    padding-right: max(1.5rem, env(safe-area-inset-right));
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+    padding-left: max(1.5rem, env(safe-area-inset-left));
+  }
+}
+
 @media print {
   @page { size: A4; margin: 14mm; }
   :root { color-scheme: light; }
