@@ -18,9 +18,28 @@ describe('V4 — validation apporteur et journal CDR', () => {
 
   it('charge les apporteurs canoniques actifs et accepte une saisie libre', () => {
     expect(consoleSource).toContain("from('business_referrers').select('*').eq('active', true).order('name')");
-    expect(consoleSource).toContain('list="cdr-business-referrer-options"');
-    expect(consoleSource).toContain('businessReferrers.map((referrer) => <option');
-    expect(consoleSource).toContain('Choisir ou saisir un apporteur');
+    expect(consoleSource).toContain('Rechercher ou saisir un apporteur...');
+    expect(consoleSource).toContain('role="combobox"');
+    expect(consoleSource).toContain('role="listbox"');
+    expect(consoleSource).toContain('matchingReferrers.map((referrer)');
+    expect(consoleSource).toContain('normalizeReferrerName(referrer.name).includes(normalizedInput)');
+  });
+
+  it('sélectionne un existant ou propose la création seulement à la validation explicite', () => {
+    expect(consoleSource).toContain('setValidatedReferrers((current) => ({ ...current, [visit.id]: referrer.name }))');
+    expect(consoleSource).toContain('normalizedInput && !hasExactReferrer');
+    expect(consoleSource).toContain('+ Ajouter « {referrerInput.trim().replace(/\\s+/g');
+    expect(consoleSource).toContain('onClick={() => void validateBusinessReferrer(visit)}');
+    expect(consoleSource).not.toContain("from('business_referrers').insert");
+    expect(consoleSource).not.toContain("from('business_referrers').upsert");
+  });
+
+  it('préserve la proposition Hôtesse et rafraîchit le nom canonique après validation', () => {
+    expect(consoleSource).toContain('Proposé par l’Hôtesse');
+    expect(consoleSource).toContain('visit.proposed_business_referrer_name');
+    expect(consoleSource).toContain('loadedReferrers.find((referrer) => referrer.id === visit.business_referrer_id)?.name ?? current[visit.id]');
+    const validation = consoleSource.slice(consoleSource.indexOf('async function validateBusinessReferrer'), consoleSource.indexOf('async function validateRank'));
+    expect(validation).toContain('await refresh()');
   });
 
   it('valide exclusivement via la RPC dédiée, sans écriture directe sur table_visits', () => {
@@ -66,8 +85,8 @@ describe('V4 — validation apporteur et journal CDR', () => {
   });
 
   it('refuse les validations hors rang ou après clôture côté backend', () => {
-    const validation = v4Migration.slice(v4Migration.indexOf('create or replace function public.validate_cdr_business_referrer'));
-    expect(validation).toContain('t.head_waiter_id = public.cdr_head_waiter_id()');
+    const validation = file('supabase/migrations/0036_cdr_rank_personal_checkpoint.sql').slice(file('supabase/migrations/0036_cdr_rank_personal_checkpoint.sql').indexOf('create or replace function public.validate_cdr_business_referrer'));
+    expect(validation).toContain('t.head_waiter_id = v_head_waiter_id');
     expect(validation).toContain('v.ended_at is null');
     expect(validation).toContain('n.ended_at is null');
   });
