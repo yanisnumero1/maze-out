@@ -6,7 +6,6 @@ import type { ArrivalDraft, BusinessReferrer, LiveTable, OperationalActorProfile
 import { computedStatus, presentTotal, stats, zoneAvailabilityStatus } from '@/lib/live';
 import { actorIdsForResolution, actorProfileMap, formatActorLabel, latestAuditActor } from '@/lib/actors';
 import { supabase } from '@/lib/supabase/client';
-import { GlobalSearch } from '@/components/global-search';
 import { getTableDisplayNumber } from '@/lib/tables';
 import { hostessCdrRanks, type HostessCdrRank } from '@/lib/hostess-ranks';
 
@@ -172,10 +171,15 @@ export function HostessConsole({ tables: initialTables, initialScreen = 'zones' 
 
   useEffect(() => {
     const zoneId = searchParams.get('zone');
-    if (screen === 'overview' || !zoneId || zone || tables.length === 0) return;
+    if (screen === 'overview' || !zoneId || tables.length === 0) return;
     const requestedZone = zones.find((item) => item.id === zoneId);
-    if (requestedZone) { setZone(requestedZone); setSelectedWaiterId(null); setScreen('waiters'); }
-  }, [screen, searchParams, tables.length, zone, zones]);
+    if (!requestedZone) return;
+    const requestedCdrId = searchParams.get('cdr');
+    const requestedCdrExists = requestedCdrId ? tables.some((table) => table.zone_id === zoneId && table.head_waiter_id === requestedCdrId) : false;
+    setZone(requestedZone);
+    setSelectedWaiterId(requestedCdrExists ? requestedCdrId : null);
+    setScreen(requestedCdrExists ? 'columns' : 'waiters');
+  }, [screen, searchParams, tables, zones]);
 
   useEffect(() => {
     const tableNumber = searchParams.get('table');
@@ -195,6 +199,10 @@ export function HostessConsole({ tables: initialTables, initialScreen = 'zones' 
     hydrateConfirmedSale(requestedTable);
     setEditing(requestedTable);
     setEditingMode(false);
+    setChangingTable(false);
+    setTransferring(false);
+    setTransferTargetId('');
+    setTransferConfirm(false);
     setNotice('');
   }, [drafts, handledTableParam, router, searchParams, tables, visitsByTable]);
 
@@ -340,7 +348,10 @@ export function HostessConsole({ tables: initialTables, initialScreen = 'zones' 
   const openCdr = (table: LiveTable) => { setZone(table.zone); setSelectedWaiterId(table.head_waiter_id); setScreen('columns'); setNotice(''); };
   const openRank = (headWaiterId: string) => { setSelectedWaiterId(headWaiterId); setScreen('columns'); setNotice(''); };
   const openOverviewRank = (item: Zone, headWaiterId: string) => { setZone(item); openRank(headWaiterId); };
-  const backToColumns = () => { setEditing(null); setEditingMode(false); setChangingTable(false); setTransferring(false); setTransferTargetId(''); setTransferConfirm(false); };
+  const backToColumns = () => {
+    setEditing(null); setEditingMode(false); setChangingTable(false); setTransferring(false); setTransferTargetId(''); setTransferConfirm(false);
+    if (searchParams.get('from') === 'global-search') router.push('/');
+  };
   const backToWaiters = () => { setSelectedWaiterId(null); setScreen('waiters'); setNotice(''); };
   const backToZones = () => {
     setScreen('overview');
@@ -426,30 +437,26 @@ export function HostessConsole({ tables: initialTables, initialScreen = 'zones' 
 
   if (screen === 'overview') return <>
     <header className="mb-4"><p className="text-sm uppercase tracking-[.25em] text-fuchsia-400">Accueil Hôtesse</p><div className="mt-1 flex flex-wrap items-center justify-between gap-3"><h1 className="text-3xl font-black">CARRÉS</h1><button type="button" onClick={() => router.push('/hostess')} className="min-h-11 rounded-xl bg-fuchsia-600 px-4 py-2 text-sm font-black">Nouvelle arrivée</button></div></header>
-    <GlobalSearch tables={tables} drafts={drafts} visits={tableVisits} businessReferrers={businessReferrers} promoters={promoters} onSelectTable={(table) => openTable(table)} onSelectPromoter={(promoter) => router.push(`/hostess?view=promoteurs&promoter=${encodeURIComponent(promoter.id)}`)} onSelectCdr={(table) => { setZone(table.zone); openRank(table.head_waiter_id ?? ''); }} />
     <section className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2" aria-label="Vue opérationnelle des carrés">{overviewZones.map(({ zone: item, ranks }) => <section className="panel min-w-0 p-4 sm:p-5" key={item.id}><header className="mb-4 border-b border-zinc-800 pb-3"><h2 className="text-xl font-black">{item.name}</h2><p className="mt-1 text-sm text-zinc-400">{stats(tables.filter((table) => table.zone_id === item.id)).present} personnes présentes</p></header><div className="grid grid-cols-1 gap-3 min-[520px]:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">{ranks.map((rank) => <CdrRankCard key={rank.headWaiter.id} rank={rank} onOpenRank={(headWaiterId) => openOverviewRank(item, headWaiterId)} onOpenTable={openTable} />)}</div>{ranks.length === 0 && <p className="text-sm text-zinc-500">Aucun CDR affecté à ce carré.</p>}</section>)}</section>
     {notice && <p className="mt-4 text-sm text-red-300">{notice}</p>}
   </>;
 
   if (screen === 'zones') return <>
     <header className="mb-5"><p className="text-sm uppercase tracking-[.25em] text-fuchsia-400">Arrivées</p><h1 className="text-3xl font-black">ARRIVÉE</h1></header>
-    <GlobalSearch tables={tables} drafts={drafts} visits={tableVisits} businessReferrers={businessReferrers} promoters={promoters} onSelectTable={(table) => router.replace(`/hostess?table=${encodeURIComponent(getTableDisplayNumber(table))}`)} onSelectPromoter={(promoter) => router.replace(`/hostess?view=promoteurs&promoter=${encodeURIComponent(promoter.id)}`)} onSelectCdr={openCdr} />
     <section className="grid grid-cols-2 gap-3 sm:gap-4">{zones.map((item) => { const summary = stats(tables.filter((table) => table.zone_id === item.id)); return <button className="panel min-h-28 min-w-0 p-4 text-left transition hover:border-violet-400/60 hover:bg-zinc-900 sm:p-5" onClick={() => openZone(item)} key={item.id}><b className="block break-words text-lg sm:text-2xl">{item.name}</b><span className="mt-2 block text-xs leading-5 text-zinc-400 sm:text-sm">{summary.available} table{summary.available !== 1 ? 's' : ''} restante{summary.available !== 1 ? 's' : ''}</span></button>; })}</section>
   </>;
 
   if (screen === 'waiters') return <>
     <header className="mb-5"><button onClick={backToZones} className="mb-3 min-h-11 rounded-lg bg-zinc-800 px-4 py-3 text-sm font-bold">← RETOUR AUX CARRÉS</button><p className="text-sm uppercase tracking-[.25em] text-fuchsia-400">Arrivées</p><h1 className="mt-1 text-3xl font-black">{zone?.name}</h1><div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-400"><span>Tables utilisées : {zoneSummary.occupied} / {inZone.length}</span><span>Clients présents : {zoneSummary.present}</span></div></header>
-    <GlobalSearch tables={tables} drafts={drafts} visits={tableVisits} businessReferrers={businessReferrers} promoters={promoters} onSelectTable={(table) => router.replace(`/hostess?table=${encodeURIComponent(getTableDisplayNumber(table))}`)} onSelectPromoter={(promoter) => router.replace(`/hostess?view=promoteurs&promoter=${encodeURIComponent(promoter.id)}`)} onSelectCdr={openCdr} />
     <section aria-label={`CDR de ${zone?.name ?? 'ce carré'}`} className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{cdrRanks.map((rank) => <CdrRankCard key={rank.headWaiter.id} rank={rank} onOpenRank={openRank} onOpenTable={openTable} />)}</section>
     {notice && <p className="mt-4 text-sm text-red-300">{notice}</p>}
   </>;
 
   if (screen === 'columns' && selectedRank && !changingTable) return <>
     <header className="mb-5"><button onClick={backToWaiters} className="mb-3 min-h-11 rounded-lg bg-zinc-800 px-4 py-3 text-sm font-bold">← TOUS LES CDR DE {zone?.name?.toLocaleUpperCase('fr-FR')}</button><p className="text-sm uppercase tracking-[.25em] text-fuchsia-400">{zone?.name}</p><h1 className="mt-1 text-3xl font-black">{selectedRank.headWaiter.first_name} {selectedRank.headWaiter.last_name}</h1><div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-400"><span>{selectedRank.occupiedTables} / {selectedRank.tables.length} tables occupées</span><span>{selectedRank.presentPeople} personnes présentes</span></div></header>
-    <GlobalSearch tables={tables} drafts={drafts} visits={tableVisits} businessReferrers={businessReferrers} promoters={promoters} onSelectTable={(table) => router.replace(`/hostess?table=${encodeURIComponent(getTableDisplayNumber(table))}`)} onSelectPromoter={(promoter) => router.replace(`/hostess?view=promoteurs&promoter=${encodeURIComponent(promoter.id)}`)} onSelectCdr={openCdr} />
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{selectedRank.tables.map(tableCard)}</section>
     {notice && <p className="mt-4 text-sm text-red-300">{notice}</p>}
   </>;
 
-  return <><header className="mb-5"><button onClick={backToZones} className="mb-3 rounded-lg bg-zinc-800 px-4 py-3 text-sm font-bold">← RETOUR AUX CARRÉS</button><p className="text-sm uppercase tracking-[.25em] text-fuchsia-400">Arrivées</p><div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2"><h1 className="text-3xl font-black">{zone?.name}</h1><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${zoneState === 'complete' ? 'bg-red-500/15 text-red-300' : zoneState === 'charged' ? 'bg-orange-500/15 text-orange-300' : 'bg-emerald-500/15 text-emerald-300'}`}>{zoneLabel}</span></div><div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-400"><span>Tables utilisées : {zoneSummary.occupied} / {inZone.length}</span><span>Clients présents : {zoneSummary.present}</span>{zone?.max_capacity && <span>Capacité zone : {zoneSummary.present} / {zone.max_capacity}</span>}</div></header><GlobalSearch tables={tables} drafts={drafts} visits={tableVisits} businessReferrers={businessReferrers} promoters={promoters} onSelectTable={(table) => router.replace(`/hostess?table=${encodeURIComponent(getTableDisplayNumber(table))}`)} onSelectPromoter={(promoter) => router.replace(`/hostess?view=promoteurs&promoter=${encodeURIComponent(promoter.id)}`)} onSelectCdr={(table) => router.replace(`/hostess?zone=${encodeURIComponent(table.zone_id)}`)} />{changingTable && <p className="mb-4 rounded-xl border border-violet-500/30 bg-violet-500/10 p-3 text-sm text-violet-200">Choisissez une table disponible compatible avec ce brouillon.</p>}<section className={columnGrid}>{waiters.map((item) => { const mine = inZone.filter((table) => table.head_waiter_id === item.id); const summary = stats(mine); return <section className="panel min-w-0 p-4" key={item.id}><header className="mb-4 border-b border-zinc-800 pb-3"><h2 className="text-xl font-black">{item.first_name} {item.last_name}</h2><p className="mt-1 text-sm text-zinc-400">{summary.available} / {mine.length} tables disponibles</p></header><div className="grid gap-3">{mine.map(tableCard)}</div></section>; })}</section>{notice && <p className="mt-4 text-sm text-red-300">{notice}</p>}</>;
+  return <><header className="mb-5"><button onClick={backToZones} className="mb-3 rounded-lg bg-zinc-800 px-4 py-3 text-sm font-bold">← RETOUR AUX CARRÉS</button><p className="text-sm uppercase tracking-[.25em] text-fuchsia-400">Arrivées</p><div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2"><h1 className="text-3xl font-black">{zone?.name}</h1><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${zoneState === 'complete' ? 'bg-red-500/15 text-red-300' : zoneState === 'charged' ? 'bg-orange-500/15 text-orange-300' : 'bg-emerald-500/15 text-emerald-300'}`}>{zoneLabel}</span></div><div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-400"><span>Tables utilisées : {zoneSummary.occupied} / {inZone.length}</span><span>Clients présents : {zoneSummary.present}</span>{zone?.max_capacity && <span>Capacité zone : {zoneSummary.present} / {zone.max_capacity}</span>}</div></header>{changingTable && <p className="mb-4 rounded-xl border border-violet-500/30 bg-violet-500/10 p-3 text-sm text-violet-200">Choisissez une table disponible compatible avec ce brouillon.</p>}<section className={columnGrid}>{waiters.map((item) => { const mine = inZone.filter((table) => table.head_waiter_id === item.id); const summary = stats(mine); return <section className="panel min-w-0 p-4" key={item.id}><header className="mb-4 border-b border-zinc-800 pb-3"><h2 className="text-xl font-black">{item.first_name} {item.last_name}</h2><p className="mt-1 text-sm text-zinc-400">{summary.available} / {mine.length} tables disponibles</p></header><div className="grid gap-3">{mine.map(tableCard)}</div></section>; })}</section>{notice && <p className="mt-4 text-sm text-red-300">{notice}</p>}</>;
 }

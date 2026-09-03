@@ -28,8 +28,8 @@ describe('retour vers l’overview des Carrés', () => {
   });
 
   it('empêche un ancien paramètre zone de rouvrir le Carré pendant le retour', () => {
-    expect(hostess).toContain("if (screen === 'overview' || !zoneId || zone || tables.length === 0) return;");
-    expect(hostess).toContain('[screen, searchParams, tables.length, zone, zones]');
+    expect(hostess).toContain("if (screen === 'overview' || !zoneId || tables.length === 0) return;");
+    expect(hostess).toContain('[screen, searchParams, tables, zones]');
   });
 
   it('conserve les deep links zone et table', () => {
@@ -40,7 +40,8 @@ describe('retour vers l’overview des Carrés', () => {
   });
 
   it('conserve le retour direct d’une mini-table vers son écran d’origine', () => {
-    expect(hostess).toContain('const backToColumns = () => { setEditing(null);');
+    expect(hostess).toContain('const backToColumns = () => {');
+    expect(hostess).toContain('setEditing(null); setEditingMode(false);');
     expect(hostess).toContain('onOpenTable={openTable}');
     expect(backHandler.indexOf("setScreen('overview')")).toBeGreaterThan(-1);
   });

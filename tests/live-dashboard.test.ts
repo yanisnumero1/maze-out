@@ -55,8 +55,7 @@ describe('dashboard Live opérationnel', () => {
   });
 
   it('conserve les cartes cliquables et les abonnements Realtime existants', () => {
-    expect(dashboardSource).toContain("from '@/components/global-search'");
-    expect(dashboardSource).toContain('<GlobalSearch tables={tables} drafts={drafts} visits={visits}');
+    expect(dashboardSource).not.toContain('<GlobalSearch');
     expect(dashboardSource).toContain('Ouvrir la vue salle');
     expect(dashboardSource).toContain('/hostess?zone=');
     expect(dashboardSource).toContain("table: 'occupancies'");
@@ -108,15 +107,13 @@ describe('dashboard Live opérationnel', () => {
     expect(hostessHubSource).toContain("setView('salle')");
   });
 
-  it('priorise les actions et la recherche avant les KPI, puis limite l’activité à trois éléments par défaut', () => {
+  it('priorise les actions avant les KPI, puis limite l’activité à trois éléments par défaut', () => {
     const kpis = dashboardSource.indexOf('aria-label="Indicateurs Live"');
     const squares = dashboardSource.indexOf('aria-label="État des carrés"');
     const actions = dashboardSource.indexOf('aria-label="Actions rapides"');
-    const search = dashboardSource.indexOf('<GlobalSearch tables={tables}');
     const activity = dashboardSource.indexOf('aria-label="Activité récente"');
     expect(actions).toBeGreaterThan(-1);
-    expect(search).toBeGreaterThan(actions);
-    expect(kpis).toBeGreaterThan(search);
+    expect(kpis).toBeGreaterThan(actions);
     expect(squares).toBeGreaterThan(kpis);
     expect(activity).toBeGreaterThan(squares);
     expect(dashboardSource).toContain('visibleActivities.slice(0, 3)');

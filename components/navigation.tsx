@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { useAppRole } from '@/components/auth-gate';
+import { HostessGlobalSearch } from '@/components/hostess-global-search';
 
 export function Navigation() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export function Navigation() {
     router.replace('/login' as any);
   }
 
-  return (
+  return <>
     <nav className="mb-5 border-b border-zinc-800 pb-3 text-sm">
       <div className="flex flex-wrap items-center gap-2">
       <Link href="/" className="mr-auto flex h-11 items-center">
@@ -38,5 +39,6 @@ export function Navigation() {
       </div>
       </div>
     </nav>
-  );
+    {role === 'hostess' && <HostessGlobalSearch />}
+  </>;
 }

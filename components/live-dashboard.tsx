@@ -6,9 +6,8 @@ import { useRouter } from 'next/navigation';
 import { liveActivity, liveDashboard, liveDashboardAlerts, liveZoneDashboard, zoneAvailabilityStatus } from '@/lib/live';
 import { actorIdsForResolution, actorProfileMap, formatActorLabel, latestAuditActor } from '@/lib/actors';
 import { supabase } from '@/lib/supabase/client';
-import { GlobalSearch } from '@/components/global-search';
 import { getTableDisplayNumber } from '@/lib/tables';
-import type { ArrivalDraft, BusinessReferrer, LiveTable, OperationalActorProfile, OperationalAuditLog, Promoter, TableVisit, TableVisitTransfer, Zone } from '@/lib/types';
+import type { ArrivalDraft, BusinessReferrer, LiveTable, OperationalActorProfile, OperationalAuditLog, TableVisit, TableVisitTransfer, Zone } from '@/lib/types';
 
 type ActivityFilter = 'all' | 'sales' | 'transfers' | 'drafts';
 type ConnectionState = 'live' | 'reconnecting' | 'offline';
@@ -51,7 +50,6 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
   const [transfers, setTransfers] = useState<TableVisitTransfer[]>([]);
   const [auditRows, setAuditRows] = useState<OperationalAuditLog[]>([]);
   const [businessReferrers, setBusinessReferrers] = useState<BusinessReferrer[]>([]);
-  const [promoters, setPromoters] = useState<Promoter[]>([]);
   const [actorProfiles, setActorProfiles] = useState<OperationalActorProfile[]>([]);
   const [activeNightId, setActiveNightId] = useState<string | null>(null);
   const [nightStartedAt, setNightStartedAt] = useState<string | null>(null);
@@ -88,18 +86,17 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
       if (startedAtError) console.error('[LIVE] Heure de début de soirée indisponible.', startedAtError);
       if (!startedAt) {
         currentNightId = null;
-        if (active) { setActiveNightId(null); setNightStartedAt(null); setDrafts([]); setVisits([]); setTransfers([]); setAuditRows([]); setActorProfiles([]); setBusinessReferrers([]); setPromoters([]); }
+        if (active) { setActiveNightId(null); setNightStartedAt(null); setDrafts([]); setVisits([]); setTransfers([]); setAuditRows([]); setActorProfiles([]); setBusinessReferrers([]); }
         return;
       }
       if (active) setNightStartedAt(startedAt);
-      const [{ data: draftRows, error: draftsError }, { data: visitRows, error: visitsError }, { data: transferRows, error: transfersError }, { data: auditData, error: auditError }, { data: promoterRows, error: promotersError }] = await Promise.all([
+      const [{ data: draftRows, error: draftsError }, { data: visitRows, error: visitsError }, { data: transferRows, error: transfersError }, { data: auditData, error: auditError }] = await Promise.all([
         supabase.from('arrival_drafts').select('*').eq('status', 'draft').eq('night_session_id', nightId).order('created_at', { ascending: true }),
         supabase.from('table_visits').select('*').eq('night_session_id', nightId).order('arrived_at', { ascending: false }),
         supabase.from('table_visit_transfers').select('*').eq('night_session_id', nightId).order('created_at', { ascending: false }),
         supabase.from('operational_audit_log').select('*').eq('night_session_id', nightId).order('created_at', { ascending: false }),
-        supabase.from('promoters').select('*').eq('night_session_id', nightId).order('name'),
       ]);
-      if (draftsError || visitsError || transfersError || auditError || promotersError) console.error('[LIVE] Chargement activité de soirée impossible.', { draftsError, visitsError, transfersError, auditError, promotersError });
+      if (draftsError || visitsError || transfersError || auditError) console.error('[LIVE] Chargement activité de soirée impossible.', { draftsError, visitsError, transfersError, auditError });
       const loadedDrafts = (draftRows ?? []) as ArrivalDraft[];
       const loadedVisits = (visitRows ?? []) as TableVisit[];
       const loadedTransfers = (transferRows ?? []) as TableVisitTransfer[];
@@ -119,7 +116,6 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
         setAuditRows(audits);
         setActorProfiles((profiles ?? []) as OperationalActorProfile[]);
         setBusinessReferrers((referrerRows ?? []) as BusinessReferrer[]);
-        setPromoters((promoterRows ?? []) as Promoter[]);
       }
     }
     async function loadCurrentNight() {
@@ -127,7 +123,7 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
       if (nightError) { console.error('[LIVE] Chargement de la soirée opérationnelle impossible.', nightError); return; }
       if (!nightId) {
         currentNightId = null;
-        if (active) { setActiveNightId(null); setNightStartedAt(null); setDrafts([]); setVisits([]); setTransfers([]); setAuditRows([]); setActorProfiles([]); setBusinessReferrers([]); setPromoters([]); }
+        if (active) { setActiveNightId(null); setNightStartedAt(null); setDrafts([]); setVisits([]); setTransfers([]); setAuditRows([]); setActorProfiles([]); setBusinessReferrers([]); }
         return;
       }
       await loadNightData(nightId);
@@ -229,7 +225,6 @@ export function LiveDashboard({ initialTables }: { initialTables: LiveTable[] })
     {loading ? <div className="panel p-6 text-zinc-300">Chargement…</div> : error ? <div className="panel border-red-500/40 p-6 text-red-200"><p>Impossible de charger les données</p><p className="mt-1 text-sm text-red-200/70">{error}</p></div> : zones.length === 0 ? <div className="panel p-6 text-zinc-300">Aucune donnée disponible</div> : <>
       <p className="mb-3 text-right text-[11px] text-zinc-600">Mis à jour {updated.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
       <section className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Actions rapides"><button type="button" onClick={() => router.push('/hostess')} className="min-h-11 rounded-xl bg-fuchsia-600 px-3 py-2 text-sm font-black text-white">Nouvelle arrivée</button><button type="button" onClick={() => router.push('/hostess?view=entrees')} className="min-h-11 rounded-xl bg-zinc-800 px-3 py-2 text-sm font-bold">Entrées club</button><button type="button" onClick={() => router.push('/hostess?view=piste')} className="min-h-11 rounded-xl bg-zinc-800 px-3 py-2 text-sm font-bold">Piste</button><button type="button" onClick={() => router.push('/hostess?view=promoteurs')} className="min-h-11 rounded-xl bg-zinc-800 px-3 py-2 text-sm font-bold">Promoteurs</button></section>
-      <div className="mt-4"><GlobalSearch tables={tables} drafts={drafts} visits={visits} businessReferrers={businessReferrers} promoters={promoters} onSelectTable={(table) => router.push(`/hostess?table=${encodeURIComponent(getTableDisplayNumber(table))}`)} onSelectPromoter={(promoter) => router.push(`/hostess?view=promoteurs&promoter=${encodeURIComponent(promoter.id)}`)} onSelectCdr={(table) => router.push(`/hostess?zone=${encodeURIComponent(table.zone_id)}`)} /></div>
       <section className="mt-5 grid grid-cols-3 gap-2" aria-label="Indicateurs Live"><article className="rounded-2xl bg-zinc-900/70 p-3 sm:p-4"><p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">Tables</p><p className="mt-1 text-2xl font-black sm:text-3xl">{dashboard.occupied}<span className="text-sm text-zinc-600">/{tables.length}</span></p><p className="mt-1 text-xs text-zinc-400">occupées</p></article><article className="rounded-2xl bg-zinc-900/70 p-3 sm:p-4"><p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">Personnes</p><p className="mt-1 text-2xl font-black sm:text-3xl">{dashboard.present}</p><p className="mt-1 text-xs text-zinc-400">présentes</p></article><article className="rounded-2xl bg-zinc-900/70 p-3 sm:p-4"><p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">Attentes</p><p className="mt-1 text-2xl font-black text-orange-200 sm:text-3xl">{dashboard.activeDraftCount}</p><p className="mt-1 text-xs text-zinc-400">{dashboard.pendingPeople} personnes</p></article></section>
       {drafts.length > 0 && <section className="panel mt-4 border border-orange-500/30 p-4" aria-label="Arrivées en attente"><h2 className="text-sm font-black uppercase tracking-[.16em] text-orange-200">Arrivées en attente · {drafts.length}</h2><div className="mt-3 grid gap-2 sm:grid-cols-2">{drafts.map((draft) => <button type="button" key={draft.id} onClick={() => router.push(`/hostess?draft=${encodeURIComponent(draft.id)}`)} className="flex items-center justify-between rounded-xl bg-zinc-900 px-3 py-2 text-left hover:bg-zinc-800"><span><b className="block">{tableName(draft.table_id)}</b><span className="text-xs text-zinc-400">{draft.present_people + draft.extra_guests} personnes attendues</span><span className="mt-1 block text-xs text-zinc-500">Préparé par {formatActorLabel(actors.get(draft.actor_id))}</span></span><span aria-hidden="true" className="text-violet-300">›</span></button>)}</div></section>}
       <section className="mt-5" aria-label="État des carrés"><h2 className="mb-3 text-lg font-black">CARRÉS</h2><div className="grid gap-3 sm:grid-cols-2">{zones.map((zone) => {

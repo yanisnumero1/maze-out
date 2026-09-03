@@ -16,7 +16,8 @@ describe('fiche table avant le workflow d’arrivée', () => {
 
   it('revient directement aux cartes CDR après une ouverture depuis la mini-grille', () => {
     expect(hostess).toContain("if (screen === 'waiters')");
-    expect(hostess).toContain('const backToColumns = () => { setEditing(null);');
+    expect(hostess).toContain('const backToColumns = () => {');
+    expect(hostess).toContain('setEditing(null); setEditingMode(false);');
     expect(hostess).toContain('<button onClick={backToColumns}');
     expect(hostess).not.toContain('setScreen(\'columns\'); openTable(table)');
   });

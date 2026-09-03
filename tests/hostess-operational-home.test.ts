@@ -45,12 +45,14 @@ describe('accueil opérationnel Hôtesse par rôle', () => {
     expect(readOnlyTable).toBeGreaterThan(-1);
     expect(editableTable).toBeGreaterThan(readOnlyTable);
     expect(overview).toBeGreaterThan(editableTable);
-    expect(hostess).toContain('const backToColumns = () => { setEditing(null);');
+    expect(hostess).toContain('const backToColumns = () => {');
+    expect(hostess).toContain('setEditing(null); setEditingMode(false);');
   });
 
-  it('garde recherche et Nouvelle arrivée immédiatement accessibles', () => {
+  it('garde la recherche globale et Nouvelle arrivée immédiatement accessibles', () => {
     const overview = hostess.slice(hostess.indexOf("if (screen === 'overview')"), hostess.indexOf("if (screen === 'zones')"));
-    expect(overview).toContain('<GlobalSearch');
+    expect(navigation).toContain("role === 'hostess' && <HostessGlobalSearch />");
+    expect(overview).not.toContain('<GlobalSearch');
     expect(overview).toContain("router.push('/hostess')");
     expect(overview).toContain('Nouvelle arrivée');
   });
@@ -68,7 +70,7 @@ describe('accueil opérationnel Hôtesse par rôle', () => {
     expect(navigation).not.toContain("from('profiles')");
   });
 
-  it('reste responsive et ne crée aucune nouvelle subscription', () => {
+  it('reste responsive et conserve une seule subscription par flux', () => {
     expect(hostess).toContain('grid grid-cols-1 gap-4 lg:grid-cols-2');
     expect(hostess).toContain('min-[520px]:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2');
     expect(hostess.match(/supabase\.channel\('hostess-live'\)/g)).toHaveLength(1);

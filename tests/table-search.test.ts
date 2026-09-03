@@ -6,6 +6,7 @@ const file = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8'
 const live = file('components/live-dashboard.tsx');
 const hostess = file('components/hostess-console.tsx');
 const navigation = file('components/navigation.tsx');
+const hostessGlobalSearch = file('components/hostess-global-search.tsx');
 const search = file('components/table-search.tsx');
 const globalSearch = file('components/global-search.tsx');
 const searchLogic = file('lib/global-search.ts');
@@ -26,8 +27,8 @@ describe('recherche rapide de table depuis le Live', () => {
   });
 
   it('navigue vers une table depuis le Live sans créer de brouillon', () => {
-    expect(live).toContain("from '@/components/global-search'");
-    expect(live).toContain('router.push(`/hostess?table=${encodeURIComponent(getTableDisplayNumber(table))}`)');
+    expect(navigation).toContain('<HostessGlobalSearch />');
+    expect(hostessGlobalSearch).toContain('router.push(`/hostess?table=${encodeURIComponent(getTableDisplayNumber(table))}&from=global-search`)');
     expect(search).not.toContain('prepare_arrival_draft');
   });
 
@@ -47,11 +48,11 @@ describe('recherche rapide de table depuis le Live', () => {
     expect(navigation).not.toContain('CDR');
   });
 
-  it('réutilise la même recherche dans la vue Salle Hôtesse avant les cartes des carrés', () => {
-    expect(hostess).toContain("import { GlobalSearch } from '@/components/global-search'");
-    const zoneScreen = hostess.slice(hostess.indexOf("if (screen === 'zones')"));
-    expect(zoneScreen).toContain('<GlobalSearch tables={tables} drafts={drafts} visits={tableVisits}');
-    expect(zoneScreen.indexOf('<GlobalSearch')).toBeLessThan(zoneScreen.indexOf('<section className="grid grid-cols-2'));
+  it('monte une seule recherche dans le shell Hôtesse commun', () => {
+    expect(navigation).toContain("role === 'hostess' && <HostessGlobalSearch />");
+    expect(hostessGlobalSearch).toContain("supabase.channel('hostess-global-search')");
+    expect(hostess).not.toContain('<GlobalSearch');
+    expect(live).not.toContain('<GlobalSearch');
     expect(hostess).toContain('display_number: getTableDisplayNumber(table)');
   });
 
