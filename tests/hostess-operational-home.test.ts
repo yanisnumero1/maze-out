@@ -38,6 +38,16 @@ describe('accueil opérationnel Hôtesse par rôle', () => {
     expect(hostess).toContain('event.stopPropagation(); onOpen(table);');
   });
 
+  it('priorise la fiche table sur le rendu de l’overview sans quitter cet écran', () => {
+    const readOnlyTable = hostess.indexOf('if (editing && !editingMode)');
+    const editableTable = hostess.indexOf('if (editing && editingMode)');
+    const overview = hostess.indexOf("if (screen === 'overview')");
+    expect(readOnlyTable).toBeGreaterThan(-1);
+    expect(editableTable).toBeGreaterThan(readOnlyTable);
+    expect(overview).toBeGreaterThan(editableTable);
+    expect(hostess).toContain('const backToColumns = () => { setEditing(null);');
+  });
+
   it('garde recherche et Nouvelle arrivée immédiatement accessibles', () => {
     const overview = hostess.slice(hostess.indexOf("if (screen === 'overview')"), hostess.indexOf("if (screen === 'zones')"));
     expect(overview).toContain('<GlobalSearch');
