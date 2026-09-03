@@ -2,33 +2,17 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
-import type { AppRole } from '@/components/auth-gate';
+import { useAppRole } from '@/components/auth-gate';
 
 export function Navigation() {
   const router = useRouter();
   const pathname = usePathname();
-  const [role, setRole] = useState<AppRole | null>(null);
+  const searchParams = useSearchParams();
+  const role = useAppRole();
 
   const linkClass = (active: boolean) => `min-h-11 rounded-full px-3 py-2 text-center font-semibold ${active ? 'bg-fuchsia-600 text-white' : 'bg-zinc-800 text-zinc-100'}`;
-
-  useEffect(() => {
-    let active = true;
-    void supabase.auth.getSession().then(async ({ data }) => {
-      if (!data.session) return;
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', data.session.user.id)
-        .single();
-      if (!error && (profile?.role === 'admin' || profile?.role === 'hostess' || profile?.role === 'cdr') && active) {
-        setRole(profile.role);
-      }
-    });
-    return () => { active = false; };
-  }, []);
 
   async function signOut() {
     const { error } = await supabase.auth.signOut();
@@ -44,7 +28,8 @@ export function Navigation() {
       </Link>
       <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
         {role === 'cdr' ? <Link className={linkClass(pathname.startsWith('/cdr'))} href="/cdr">Live</Link> : <>
-        <Link className={linkClass(pathname === '/')} href="/">Accueil</Link>
+        <Link className={linkClass(pathname === '/' && searchParams.get('view') !== 'live')} href="/">Accueil</Link>
+        {role === 'hostess' && <Link className={linkClass(pathname === '/' && searchParams.get('view') === 'live')} href={'/?view=live' as any}>Vue Live</Link>}
         <Link className={linkClass(pathname.startsWith('/hostess'))} href="/hostess">Arrivée</Link>
         {role === 'admin' && <Link className={linkClass(pathname.startsWith('/admin'))} href="/admin">Administration</Link>}
         {role === 'admin' && <Link className={linkClass(pathname.startsWith('/recap'))} href={'/recap' as any}>Récapitulatif</Link>}

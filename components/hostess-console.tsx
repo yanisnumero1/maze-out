@@ -8,9 +8,9 @@ import { actorIdsForResolution, actorProfileMap, formatActorLabel, latestAuditAc
 import { supabase } from '@/lib/supabase/client';
 import { GlobalSearch } from '@/components/global-search';
 import { getTableDisplayNumber } from '@/lib/tables';
-import { hostessCdrRanks } from '@/lib/hostess-ranks';
+import { hostessCdrRanks, type HostessCdrRank } from '@/lib/hostess-ranks';
 
-type Screen = 'zones' | 'waiters' | 'columns';
+type Screen = 'overview' | 'zones' | 'waiters' | 'columns';
 
 const tableStyles: Record<TableStatus, { badge: string; label: string }> = {
   free: { badge: 'bg-emerald-500/15 text-emerald-300 ring-emerald-400/30', label: 'LIBRE' },
@@ -43,11 +43,15 @@ function RankTableIndicator({ table, onOpen }: { table: LiveTable; onOpen: (tabl
   return <button type="button" aria-label={`Table ${getTableDisplayNumber(table)} — ${state}`} title={`Table ${getTableDisplayNumber(table)} — ${state}`} onKeyDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onOpen(table); }} className={occupied ? 'flex h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg border border-red-400/40 bg-red-500/15 px-2 font-mono text-sm font-black text-red-100 transition hover:border-red-300 hover:bg-red-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300' : 'flex h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-2 font-mono text-sm font-black text-emerald-100 transition hover:border-emerald-300 hover:bg-emerald-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300'}>{getTableDisplayNumber(table)}</button>;
 }
 
-export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] }) {
+function CdrRankCard({ rank, onOpenRank, onOpenTable }: { rank: HostessCdrRank; onOpenRank: (headWaiterId: string) => void; onOpenTable: (table: LiveTable) => void }) {
+  return <article role="button" tabIndex={0} aria-label={`Ouvrir le rang de ${rank.headWaiter.first_name} ${rank.headWaiter.last_name}`} onClick={() => onOpenRank(rank.headWaiter.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpenRank(rank.headWaiter.id); } }} className="panel min-w-0 cursor-pointer p-4 text-left transition hover:border-violet-400/60 hover:bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 sm:p-5"><b className="block break-words text-xl font-black">{rank.headWaiter.first_name} {rank.headWaiter.last_name}</b><span className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-zinc-400"><span>{rank.occupiedTables} / {rank.tables.length} tables occupées</span><span><b className="text-base text-fuchsia-200">{rank.presentPeople}</b> personne{rank.presentPeople !== 1 ? 's' : ''}</span></span><span className="mt-4 flex flex-wrap gap-2" aria-label={`Tables du rang de ${rank.headWaiter.first_name}`}>{rank.tables.map((table) => <RankTableIndicator key={table.id} table={table} onOpen={onOpenTable} />)}</span><span className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500" aria-label="Légende des tables"><span><span aria-hidden="true" className="text-emerald-400">●</span> Libre</span><span><span aria-hidden="true" className="text-red-400">●</span> Occupée</span></span></article>;
+}
+
+export function HostessConsole({ tables: initialTables, initialScreen = 'zones' }: { tables: LiveTable[]; initialScreen?: 'overview' | 'zones' }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tables, setTables] = useState<LiveTable[]>(() => initialTables.map((table) => ({ ...table, display_number: getTableDisplayNumber(table) })));
-  const [screen, setScreen] = useState<Screen>('zones');
+  const [screen, setScreen] = useState<Screen>(initialScreen);
   const [zone, setZone] = useState<Zone | null>(null);
   const [selectedWaiterId, setSelectedWaiterId] = useState<string | null>(null);
   const [editing, setEditing] = useState<LiveTable | null>(null);
@@ -84,6 +88,7 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
   const zones = useMemo(() => [...new Map(tables.map((table) => [table.zone.id, table.zone])).values()].sort((left, right) => left.display_order - right.display_order), [tables]);
   const inZone = useMemo(() => zone ? tables.filter((table) => table.zone_id === zone.id) : [], [tables, zone]);
   const cdrRanks = useMemo(() => hostessCdrRanks(inZone), [inZone]);
+  const overviewZones = useMemo(() => zones.map((item) => ({ zone: item, ranks: hostessCdrRanks(tables.filter((table) => table.zone_id === item.id)) })), [tables, zones]);
   const selectedRank = useMemo(() => cdrRanks.find((rank) => rank.headWaiter.id === selectedWaiterId) ?? null, [cdrRanks, selectedWaiterId]);
   const waiters = useMemo(() => (screen === 'columns' && selectedRank && !changingTable ? [selectedRank] : cdrRanks).map((rank) => rank.headWaiter), [cdrRanks, changingTable, screen, selectedRank]);
   const ownDraft = useMemo(() => drafts.find((draft) => draft.actor_id === actorId) ?? null, [actorId, drafts]);
@@ -334,6 +339,7 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
   const openZone = (item: Zone) => { setZone(item); setSelectedWaiterId(null); setScreen('waiters'); setNotice(''); };
   const openCdr = (table: LiveTable) => { setZone(table.zone); setSelectedWaiterId(table.head_waiter_id); setScreen('columns'); setNotice(''); };
   const openRank = (headWaiterId: string) => { setSelectedWaiterId(headWaiterId); setScreen('columns'); setNotice(''); };
+  const openOverviewRank = (item: Zone, headWaiterId: string) => { setZone(item); openRank(headWaiterId); };
   const backToColumns = () => { setEditing(null); setEditingMode(false); setChangingTable(false); setTransferring(false); setTransferTargetId(''); setTransferConfirm(false); };
   const backToWaiters = () => { setSelectedWaiterId(null); setScreen('waiters'); setNotice(''); };
   const backToZones = () => router.push('/' as any);
@@ -353,6 +359,13 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
     const draftAuthor = draft ? formatActorLabel(actors.get(draft.actor_id)) : null;
     return <button disabled={changingTable && !canMove} onClick={() => changingTable ? void moveDraft(table) : openTable(table)} className="group flex min-h-[132px] w-full items-center rounded-2xl border border-violet-500/30 bg-zinc-900 p-4 text-left shadow-lg shadow-black/20 transition hover:border-violet-400/60 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40" key={table.id}><div className="min-w-0 flex-1"><b className="block text-lg tracking-wide text-white">TABLE {table.display_number}</b><span className="mt-1 block text-sm text-zinc-300">{draft ? `${draft.present_people} personne${draft.present_people !== 1 ? 's' : ''}${draft.extra_guests > 0 ? ` + ${draft.extra_guests} invité${draft.extra_guests !== 1 ? 's' : ''}` : ''}` : `${clients} personne${clients !== 1 ? 's' : ''}`}</span><span className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ring-1 ${style.badge}`}>{style.label}</span>{draftAuthor && <span className="mt-2 block text-xs text-zinc-500">Préparé par {draftAuthor}</span>}{activeSales[table.id] && <span className="mt-2 block text-xs text-zinc-400">Vente #{activeSales[table.id]}</span>}{draftOwn && <span className="mt-2 block text-xs text-violet-200">À confirmer</span>}<div className="mt-3 border-t border-zinc-800 pt-2 text-xs leading-5 text-zinc-400">{recentVisits.length ? recentVisits.map((visit) => <span className="block truncate" key={visit.id}>Vente #{visit.sale_number ?? '—'} · {formatTime(visit.arrived_at)}{visit.ended_at ? ` → ${formatTime(visit.ended_at)}` : ''} · {visit.ended_at ? 'Terminée' : 'En cours'}</span>) : <span>Aucune vente</span>}{visitsForCard.length > recentVisits.length && <span className="block">+{visitsForCard.length - recentVisits.length} vente{visitsForCard.length - recentVisits.length > 1 ? 's' : ''} précédente{visitsForCard.length - recentVisits.length > 1 ? 's' : ''}</span>}</div></div><span aria-hidden="true" className="ml-3 shrink-0 text-xl text-violet-300/70">›</span></button>;
   };
+
+  if (screen === 'overview') return <>
+    <header className="mb-4"><p className="text-sm uppercase tracking-[.25em] text-fuchsia-400">Accueil Hôtesse</p><div className="mt-1 flex flex-wrap items-center justify-between gap-3"><h1 className="text-3xl font-black">CARRÉS</h1><button type="button" onClick={() => router.push('/hostess')} className="min-h-11 rounded-xl bg-fuchsia-600 px-4 py-2 text-sm font-black">Nouvelle arrivée</button></div></header>
+    <GlobalSearch tables={tables} drafts={drafts} visits={tableVisits} businessReferrers={businessReferrers} promoters={promoters} onSelectTable={(table) => openTable(table)} onSelectPromoter={(promoter) => router.push(`/hostess?view=promoteurs&promoter=${encodeURIComponent(promoter.id)}`)} onSelectCdr={(table) => { setZone(table.zone); openRank(table.head_waiter_id ?? ''); }} />
+    <section className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2" aria-label="Vue opérationnelle des carrés">{overviewZones.map(({ zone: item, ranks }) => <section className="panel min-w-0 p-4 sm:p-5" key={item.id}><header className="mb-4 border-b border-zinc-800 pb-3"><h2 className="text-xl font-black">{item.name}</h2><p className="mt-1 text-sm text-zinc-400">{stats(tables.filter((table) => table.zone_id === item.id)).present} personnes présentes</p></header><div className="grid grid-cols-1 gap-3 min-[520px]:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">{ranks.map((rank) => <CdrRankCard key={rank.headWaiter.id} rank={rank} onOpenRank={(headWaiterId) => openOverviewRank(item, headWaiterId)} onOpenTable={openTable} />)}</div>{ranks.length === 0 && <p className="text-sm text-zinc-500">Aucun CDR affecté à ce carré.</p>}</section>)}</section>
+    {notice && <p className="mt-4 text-sm text-red-300">{notice}</p>}
+  </>;
 
   if (displayedDraft && !changingTable && !editing) {
     const draftTable = tables.find((table) => table.id === displayedDraft.table_id);
@@ -414,7 +427,7 @@ export function HostessConsole({ tables: initialTables }: { tables: LiveTable[] 
   if (screen === 'waiters') return <>
     <header className="mb-5"><button onClick={backToZones} className="mb-3 min-h-11 rounded-lg bg-zinc-800 px-4 py-3 text-sm font-bold">← RETOUR AUX CARRÉS</button><p className="text-sm uppercase tracking-[.25em] text-fuchsia-400">Arrivées</p><h1 className="mt-1 text-3xl font-black">{zone?.name}</h1><div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-400"><span>Tables utilisées : {zoneSummary.occupied} / {inZone.length}</span><span>Clients présents : {zoneSummary.present}</span></div></header>
     <GlobalSearch tables={tables} drafts={drafts} visits={tableVisits} businessReferrers={businessReferrers} promoters={promoters} onSelectTable={(table) => router.replace(`/hostess?table=${encodeURIComponent(getTableDisplayNumber(table))}`)} onSelectPromoter={(promoter) => router.replace(`/hostess?view=promoteurs&promoter=${encodeURIComponent(promoter.id)}`)} onSelectCdr={openCdr} />
-    <section aria-label={`CDR de ${zone?.name ?? 'ce carré'}`} className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{cdrRanks.map((rank) => <article key={rank.headWaiter.id} role="button" tabIndex={0} aria-label={`Ouvrir le rang de ${rank.headWaiter.first_name} ${rank.headWaiter.last_name}`} onClick={() => openRank(rank.headWaiter.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openRank(rank.headWaiter.id); } }} className="panel min-w-0 cursor-pointer p-4 text-left transition hover:border-violet-400/60 hover:bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 sm:p-5"><b className="block break-words text-xl font-black">{rank.headWaiter.first_name} {rank.headWaiter.last_name}</b><span className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-zinc-400"><span>{rank.occupiedTables} / {rank.tables.length} tables occupées</span><span><b className="text-base text-fuchsia-200">{rank.presentPeople}</b> personne{rank.presentPeople !== 1 ? 's' : ''}</span></span><span className="mt-4 flex flex-wrap gap-2" aria-label={`Tables du rang de ${rank.headWaiter.first_name}`}>{rank.tables.map((table) => <RankTableIndicator key={table.id} table={table} onOpen={openTable} />)}</span><span className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500" aria-label="Légende des tables"><span><span aria-hidden="true" className="text-emerald-400">●</span> Libre</span><span><span aria-hidden="true" className="text-red-400">●</span> Occupée</span></span></article>)}</section>
+    <section aria-label={`CDR de ${zone?.name ?? 'ce carré'}`} className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{cdrRanks.map((rank) => <CdrRankCard key={rank.headWaiter.id} rank={rank} onOpenRank={openRank} onOpenTable={openTable} />)}</section>
     {notice && <p className="mt-4 text-sm text-red-300">{notice}</p>}
   </>;
 

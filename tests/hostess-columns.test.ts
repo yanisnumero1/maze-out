@@ -7,7 +7,7 @@ const live = readFileSync(resolve(process.cwd(), 'components/live-dashboard.tsx'
 
 describe('vue salle Hôtesse par CDR', () => {
   it('affiche une grille de CDR avant leurs tables', () => {
-    expect(hostess).toContain("type Screen = 'zones' | 'waiters' | 'columns'");
+    expect(hostess).toContain("type Screen = 'overview' | 'zones' | 'waiters' | 'columns'");
     expect(hostess).toContain("if (screen === 'waiters')");
     expect(hostess).toContain('cdrRanks.map((rank)');
     expect(hostess).toContain('min-[420px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4');
@@ -67,7 +67,7 @@ describe('vue salle Hôtesse par CDR', () => {
   it('annonce chaque état sans dépendre uniquement de la couleur et conserve le clic du rang', () => {
     expect(hostess).toContain('aria-label={`Table ${getTableDisplayNumber(table)} — ${state}`}');
     expect(hostess).toContain('title={`Table ${getTableDisplayNumber(table)} — ${state}`}');
-    expect(hostess).toContain('onClick={() => openRank(rank.headWaiter.id)}');
+    expect(hostess).toContain('onClick={() => onOpenRank(rank.headWaiter.id)}');
     expect(hostess).toContain('mt-4 flex flex-wrap gap-2');
   });
 
@@ -75,14 +75,15 @@ describe('vue salle Hôtesse par CDR', () => {
     expect(hostess).toContain('onOpen: (table: LiveTable) => void');
     expect(hostess).toContain('event.stopPropagation(); onOpen(table);');
     expect(hostess).toContain('onKeyDown={(event) => event.stopPropagation()}');
-    expect(hostess).toContain('table={table} onOpen={openTable}');
+    expect(hostess).toContain('table={table} onOpen={onOpenTable}');
+    expect(hostess).toContain('onOpenTable={openTable}');
     expect(hostess).toContain('type="button" aria-label={`Table ${getTableDisplayNumber(table)} — ${state}`}');
   });
 
   it('conserve une carte CDR cliquable et accessible au clavier sans imbriquer des boutons', () => {
     expect(hostess).toContain('role="button" tabIndex={0}');
     expect(hostess).toContain("event.key === 'Enter' || event.key === ' '");
-    expect(hostess).toContain('openRank(rank.headWaiter.id)');
+    expect(hostess).toContain('onOpenRank(rank.headWaiter.id)');
     expect(hostess).toContain('focus-visible:ring-2 focus-visible:ring-violet-400');
   });
 

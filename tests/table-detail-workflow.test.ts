@@ -10,7 +10,8 @@ describe('fiche table avant le workflow d’arrivée', () => {
     expect(hostess).toContain('if (editing && !editingMode)');
     expect(hostess).toContain('Historique de la soirée');
     expect(hostess).toContain("const badge = draft ? { label: 'ARRIVÉE EN ATTENTE'");
-    expect(hostess).toContain('table={table} onOpen={openTable}');
+    expect(hostess).toContain('table={table} onOpen={onOpenTable}');
+    expect(hostess).toContain('onOpenTable={openTable}');
   });
 
   it('revient directement aux cartes CDR après une ouverture depuis la mini-grille', () => {

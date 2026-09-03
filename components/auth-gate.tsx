@@ -1,15 +1,18 @@
 'use client';
 
 import type { Session } from '@supabase/supabase-js';
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 
 export type AppRole = 'admin' | 'hostess' | 'cdr';
+const AppRoleContext = createContext<AppRole | null>(null);
+export const useAppRole = () => useContext(AppRoleContext);
 
 export function AuthGate({ children, requireAdmin = false, requireCdr = false }: { children: React.ReactNode; requireAdmin?: boolean; requireCdr?: boolean }) {
   const router = useRouter();
   const [state, setState] = useState<'checking' | 'allowed'>('checking');
+  const [allowedRole, setAllowedRole] = useState<AppRole | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -48,7 +51,7 @@ export function AuthGate({ children, requireAdmin = false, requireCdr = false }:
         return;
       }
 
-      if (active) setState('allowed');
+      if (active) { setAllowedRole(role); setState('allowed'); }
     }
 
     void supabase.auth.getSession().then(({ data, error }) => {
@@ -72,5 +75,5 @@ export function AuthGate({ children, requireAdmin = false, requireCdr = false }:
     return <p className="p-5 text-center text-sm text-zinc-400">Connexion en cours...</p>;
   }
 
-  return <>{children}</>;
+  return <AppRoleContext.Provider value={allowedRole}>{children}</AppRoleContext.Provider>;
 }
