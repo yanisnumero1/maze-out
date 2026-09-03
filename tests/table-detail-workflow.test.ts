@@ -10,6 +10,14 @@ describe('fiche table avant le workflow d’arrivée', () => {
     expect(hostess).toContain('if (editing && !editingMode)');
     expect(hostess).toContain('Historique de la soirée');
     expect(hostess).toContain("const badge = draft ? { label: 'ARRIVÉE EN ATTENTE'");
+    expect(hostess).toContain('table={table} onOpen={openTable}');
+  });
+
+  it('revient directement aux cartes CDR après une ouverture depuis la mini-grille', () => {
+    expect(hostess).toContain("if (screen === 'waiters')");
+    expect(hostess).toContain('const backToColumns = () => { setEditing(null);');
+    expect(hostess).toContain('<button onClick={backToColumns}');
+    expect(hostess).not.toContain('setScreen(\'columns\'); openTable(table)');
   });
 
   it('propose une installation ou une revente explicite avant de préparer un brouillon', () => {

@@ -71,6 +71,21 @@ describe('vue salle Hôtesse par CDR', () => {
     expect(hostess).toContain('mt-4 flex flex-wrap gap-2');
   });
 
+  it('ouvre directement une mini-table sans déclencher le clic de la carte CDR', () => {
+    expect(hostess).toContain('onOpen: (table: LiveTable) => void');
+    expect(hostess).toContain('event.stopPropagation(); onOpen(table);');
+    expect(hostess).toContain('onKeyDown={(event) => event.stopPropagation()}');
+    expect(hostess).toContain('table={table} onOpen={openTable}');
+    expect(hostess).toContain('type="button" aria-label={`Table ${getTableDisplayNumber(table)} — ${state}`}');
+  });
+
+  it('conserve une carte CDR cliquable et accessible au clavier sans imbriquer des boutons', () => {
+    expect(hostess).toContain('role="button" tabIndex={0}');
+    expect(hostess).toContain("event.key === 'Enter' || event.key === ' '");
+    expect(hostess).toContain('openRank(rank.headWaiter.id)');
+    expect(hostess).toContain('focus-visible:ring-2 focus-visible:ring-violet-400');
+  });
+
   it('conserve brouillons, ventes et déplacement sécurisé', () => {
     expect(hostess).toContain("from('arrival_drafts')");
     expect(hostess).toContain("from('table_visits')");
