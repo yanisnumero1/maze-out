@@ -38,7 +38,7 @@ describe('V4 — détail des ventes du récapitulatif Admin', () => {
   it('rend des cartes Admin adaptées au mobile, sans exposer le récap aux autres rôles', () => {
     expect(recap).toContain('DÉTAIL DES VENTES');
     expect(recap).toContain('grid gap-3 sm:grid-cols-2');
-    for (const label of ['CDR final', 'Réservation · ', 'Conso · ', 'Commentaire · ', 'Note CDR historique · ', 'Montant apporteur · ', 'Apporteur validé · ']) expect(recap).toContain(label);
+    for (const label of ['CDR final', 'Réservation · ', 'Conso · ', 'Commentaire · ', 'Note CDR historique · ', 'Montant · ', 'Apporteur validé · ']) expect(recap).toContain(label);
     expect(file('app/recap/page.tsx')).toContain('<AuthGate requireAdmin>');
   });
 

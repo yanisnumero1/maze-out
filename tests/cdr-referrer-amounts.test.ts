@@ -81,14 +81,14 @@ describe('montants CDR par apporteur', () => {
   });
 
   it('affiche le récap avant/après validation, les anomalies et le PDF', () => {
-    for (const text of ['MONTANT APPORTEUR', 'RÉCAP APPORTEURS', 'RÉCAP APPORTEURS D’AFFAIRES', 'TOTAL DU RANG', 'unlinkedPositiveSales']) expect(consoleSource).toContain(text);
+    for (const text of ['MONTANT', 'RÉCAP APPORTEURS', 'RÉCAP APPORTEURS D’AFFAIRES', 'TOTAL DU RANG', 'unlinkedPositiveSales']) expect(consoleSource).toContain(text);
     expect(consoleSource).toContain("disabled={rankValidationState === 'saving' || unlinkedPositiveSales.length > 0}");
     expect(consoleSource).toContain('aria-label="Récap apporteurs d’affaires"');
     expect(consoleSource).toContain('formatCdrAmount(rankTotalAmount)');
   });
 
   it('ajoute le montant au détail Admin sans modifier ses KPI', () => {
-    expect(adminRecap).toContain('Montant apporteur · ');
+    expect(adminRecap).toContain('Montant · ');
     expect(adminRecap).toContain('sale.cdrAmount');
   });
 });
