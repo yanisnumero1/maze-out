@@ -49,9 +49,26 @@ describe('vue salle Hôtesse par CDR', () => {
   });
 
   it('présente les compteurs live de chaque rang, y compris à zéro', () => {
-    expect(hostess).toContain('{rank.occupiedTables} table');
+    expect(hostess).toContain('{rank.occupiedTables} / {rank.tables.length} tables occupées');
     expect(hostess).toContain('{rank.presentPeople}');
     expect(hostess).toContain('hostessCdrRanks(inZone)');
+  });
+
+  it('visualise les vraies tables du rang en vert si libres et rouge si occupées', () => {
+    expect(hostess).toContain('function RankTableIndicator');
+    expect(hostess).toContain('const occupied = presentTotal(table) > 0');
+    expect(hostess).toContain('rank.tables.map((table) => <RankTableIndicator');
+    expect(hostess).toContain('bg-emerald-500/15');
+    expect(hostess).toContain('bg-red-500/15');
+    expect(hostess).toContain('●</span> Libre');
+    expect(hostess).toContain('●</span> Occupée');
+  });
+
+  it('annonce chaque état sans dépendre uniquement de la couleur et conserve le clic du rang', () => {
+    expect(hostess).toContain('aria-label={`Table ${getTableDisplayNumber(table)} — ${state}`}');
+    expect(hostess).toContain('title={`Table ${getTableDisplayNumber(table)} — ${state}`}');
+    expect(hostess).toContain('onClick={() => openRank(rank.headWaiter.id)}');
+    expect(hostess).toContain('mt-4 flex flex-wrap gap-2');
   });
 
   it('conserve brouillons, ventes et déplacement sécurisé', () => {

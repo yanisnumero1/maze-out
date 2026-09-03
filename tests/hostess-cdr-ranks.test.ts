@@ -32,6 +32,7 @@ describe('synthèse live des rangs CDR', () => {
   it('compte uniquement les tables actives actuellement occupées et les personnes présentes', () => {
     const [rank] = hostessCdrRanks([table('01', samir, 5), table('02', samir, 7), table('03', samir), table('04', samir, 9, false)]);
     expect(rank).toMatchObject({ occupiedTables: 2, presentPeople: 12 });
+    expect(rank.tables.map((item) => item.display_number)).toEqual(['01', '02', '03']);
   });
 
   it('recalcule une arrivée puis une libération depuis les occupations live', () => {
@@ -50,5 +51,12 @@ describe('synthèse live des rangs CDR', () => {
   it('ne double-compte pas une revente car seul l’état actuel de la table est lu', () => {
     const [rank] = hostessCdrRanks([table('01', samir, 4)]);
     expect(rank).toMatchObject({ occupiedTables: 1, presentPeople: 4 });
+  });
+
+  it('conserve le nombre variable et les vrais numéros des tables du rang', () => {
+    const fourTables = hostessCdrRanks(['01', '08', '15', '23'].map((number) => table(number, samir)))[0];
+    const twelveTables = hostessCdrRanks(['01', '02', '08', '09', '15', '16', '22', '23', '29', '30', '36', '37'].map((number) => table(number, samir)))[0];
+    expect(fourTables.tables.map((item) => item.display_number)).toEqual(['01', '08', '15', '23']);
+    expect(twelveTables.tables).toHaveLength(12);
   });
 });
