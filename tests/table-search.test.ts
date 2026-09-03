@@ -69,9 +69,9 @@ describe('recherche rapide de table depuis le Live', () => {
   it('reste vide sans saisie, accessible, effaçable et tactile', () => {
     expect(searchLogic).toContain('if (!query) return []');
     expect(globalSearch).toContain('Effacer la recherche');
-    expect(globalSearch).toContain('focus:ring-violet-500/30');
+    expect(globalSearch).toContain('focus:ring-violet-500/20');
     expect(globalSearch).toContain('focus-visible:ring-violet-400');
-    expect(globalSearch).toContain('max-h-[min(30rem,65dvh)]');
+    expect(globalSearch).toContain('max-h-[min(24rem,55dvh)]');
     expect(globalSearch).toContain("event.key === 'Escape'");
     expect(globalSearch).toContain("event.key !== 'Enter'");
     expect(globalSearch).toContain("document.addEventListener('mousedown'");

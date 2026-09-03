@@ -22,7 +22,7 @@ export function Navigation() {
   }
 
   return <>
-    <nav className="mb-5 border-b border-zinc-800 pb-3 text-sm">
+    <nav className={`${role === 'hostess' ? 'mb-2' : 'mb-5'} border-b border-zinc-800 pb-3 text-sm`}>
       <div className="flex flex-wrap items-center gap-2">
       <Link href="/" className="mr-auto flex h-11 items-center">
         <Image src="/bridge-logo.png" alt="BRIDGE — Pont Alexandre III" width={160} height={57} className="h-8 w-32 object-contain" />

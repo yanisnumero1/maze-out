@@ -15,6 +15,7 @@ describe('recherche globale persistante Hôtesse', () => {
   it('est rendue une seule fois sous la navigation et uniquement pour le rôle Hôtesse', () => {
     expect(navigation.indexOf('<HostessGlobalSearch />')).toBeGreaterThan(navigation.indexOf('</nav>'));
     expect(navigation).toContain("role === 'hostess' && <HostessGlobalSearch />");
+    expect(navigation).toContain("role === 'hostess' ? 'mb-2' : 'mb-5'");
     expect(hostess).not.toContain('<GlobalSearch');
     expect(live).not.toContain('<GlobalSearch');
     expect(cdrPage).not.toContain('Navigation');
@@ -48,10 +49,28 @@ describe('recherche globale persistante Hôtesse', () => {
   });
 
   it('reste compacte, tactile et lisible sur mobile', () => {
-    expect(search).toContain('p-3 sm:p-4');
-    expect(search).toContain('min-h-12 w-full');
-    expect(search).toContain('max-h-[min(30rem,65dvh)]');
-    expect(search).toContain('Rechercher table, réservation, apporteur, promoteur ou CDR…');
-    expect(search).toContain('Aucun résultat.');
+    expect(search).toContain('w-full max-w-4xl');
+    expect(search).toContain('min-h-11 w-full');
+    expect(search).toContain('max-h-[min(24rem,55dvh)]');
+    expect(search).toContain('Rechercher une table, réservation, apporteur, promoteur ou CDR…');
+    expect(search).toContain('sm:hidden');
+    expect(search).toContain('Rechercher…');
+    expect(search).toContain('Aucun résultat');
+  });
+
+  it('intègre visuellement le champ sans carte ni titre visible', () => {
+    expect(search).not.toContain('className="panel');
+    expect(search).not.toContain('>Recherche rapide</label>');
+    expect(search).toContain('className="sr-only"');
+    expect(search).toContain('aria-label="Recherche globale"');
+    expect(search).toContain('<svg aria-hidden="true"');
+  });
+
+  it('conserve le focus lors de l’effacement et place les résultats sous le champ', () => {
+    expect(search).toContain('onMouseDown={(event) => event.preventDefault()}');
+    expect(search).toContain("inputRef.current?.focus()");
+    expect(search).toContain('absolute left-0 right-0 z-50 mt-1');
+    for (const label of ['TABLE', 'RÉSERVATION', 'APPORTEUR', 'PROMOTEUR', 'CDR']) expect(search).toContain(`'${label}'`);
+    expect(search).toContain('onClick={() => choose(result)}');
   });
 });
