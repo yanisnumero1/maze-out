@@ -124,6 +124,7 @@ export type AdminSaleDetail = {
   consumption: string | null;
   saleComment: string | null;
   cdrComment: string | null;
+  cdrAmount: number | null;
   proposedBusinessReferrerName: string | null;
   validatedBusinessReferrerName: string | null;
   arrivedAt: string;
@@ -152,6 +153,7 @@ export function recapSaleDetails(visits: TableVisit[], tables: LiveTable[], refe
       consumption: meaningfulText(visit.consumption),
       saleComment: meaningfulText(visit.sale_comment),
       cdrComment: meaningfulText(visit.cdr_comment),
+      cdrAmount: visit.cdr_amount ?? null,
       proposedBusinessReferrerName: meaningfulText(visit.proposed_business_referrer_name),
       validatedBusinessReferrerName: visit.business_referrer_id ? referrerById.get(visit.business_referrer_id)?.name ?? null : null,
       arrivedAt: visit.arrived_at,

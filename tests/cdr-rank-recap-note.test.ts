@@ -42,14 +42,14 @@ describe('V4 — note CDR dans le récapitulatif du rang', () => {
     expect(types).toContain('sale_comment: string | null;');
     expect(types).toContain('cdr_comment: string | null;');
     expect(consoleSource).toContain("sale.sale_comment || 'Non renseigné'");
-    expect(consoleSource).toContain("sale.cdr_comment || '—'");
-    expect(consoleSource).toContain('Note CDR · ');
+    expect(consoleSource).toContain('sale.cdr_comment &&');
+    expect(consoleSource).toContain('Note CDR historique');
   });
 
-  it('recharge le récapitulatif après la sauvegarde de note, sans abonnement additionnel', () => {
-    const saveNotes = consoleSource.slice(consoleSource.indexOf('async function saveNotes'), consoleSource.indexOf('async function validateBusinessReferrer'));
-    expect(saveNotes).toContain("rpc('update_cdr_visit_notes'");
-    expect(saveNotes).toContain('await refresh();');
+  it('recharge le récapitulatif après la sauvegarde du montant, sans abonnement additionnel', () => {
+    const saveAmount = consoleSource.slice(consoleSource.indexOf('async function saveAmount'), consoleSource.indexOf('async function validateBusinessReferrer'));
+    expect(saveAmount).toContain("rpc('update_cdr_visit_amount'");
+    expect(saveAmount).toContain('await refresh();');
     expect(consoleSource).not.toContain("table: 'night_sessions'");
   });
 

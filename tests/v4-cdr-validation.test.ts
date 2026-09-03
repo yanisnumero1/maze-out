@@ -69,8 +69,7 @@ describe('V4 — validation apporteur et journal CDR', () => {
   });
 
   it('préserve la note CDR historique dans sa RPC dédiée', () => {
-    expect(consoleSource).toContain("rpc('update_cdr_visit_notes'");
-    expect(consoleSource).toContain('Note CDR');
+    expect(consoleSource).toContain('Note CDR historique');
     expect(cdrMigration).toContain('set cdr_comment = v_comment');
     expect(cdrMigration).toContain('business_referrer = v_referrer');
   });

@@ -39,14 +39,14 @@ describe('notes et apporteur CDR sur une visite active', () => {
     expect(migration).toContain("nullif(btrim(coalesce(p_business_referrer, '')), '')");
   });
 
-  it('affiche les champs seulement pour une visite active et sauvegarde via la RPC', () => {
+  it('conserve les anciennes notes en lecture et sauvegarde le nouveau montant via sa RPC', () => {
     expect(consoleSource).toContain("supabase.from('table_visits').select('*').is('ended_at', null)");
-    expect(consoleSource).toContain('{visit && noteDraft &&');
+    expect(consoleSource).toContain('{visit && <div');
     expect(consoleSource).toContain('Commentaire');
-    expect(consoleSource).toContain('Apporteur historique');
-    expect(consoleSource).toContain("rpc('update_cdr_visit_notes'");
+    expect(consoleSource).toContain('Note CDR historique');
+    expect(consoleSource).toContain("rpc('update_cdr_visit_amount'");
     expect(consoleSource).toContain('Enregistrement...');
-    expect(consoleSource).toContain('Enregistré');
+    expect(consoleSource).toContain('Montant enregistré');
   });
 
   it('distingue visuellement une table libre d’une table occupée', () => {

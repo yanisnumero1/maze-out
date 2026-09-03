@@ -26,7 +26,7 @@ describe('accès CDR lecture seule', () => {
   });
   it('ne donne pas de politique ni de composant d’écriture directe au CDR', () => {
     expect(migration).not.toMatch(/create policy[^;]*(insert|update|delete)[^;]*cdr/i);
-    expect(consoleSource).toContain("rpc('update_cdr_visit_notes'");
+    expect(consoleSource).toContain("rpc('update_cdr_visit_amount'");
     expect(consoleSource).not.toContain("rpc('prepare_arrival_draft'");
     expect(consoleSource).not.toContain("rpc('transfer_operational_table'");
     expect(consoleSource).not.toContain("rpc('release_operational_table'");

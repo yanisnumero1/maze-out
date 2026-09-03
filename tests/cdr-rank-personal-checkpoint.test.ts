@@ -24,8 +24,8 @@ describe('checkpoint personnel du rang CDR', () => {
 
   it('verrouille les notes après validation du rang côté SQL et interface', () => {
     expect(consoleSource).toContain('const rankIsReadOnly = Boolean(activeRankStatus?.is_read_only)');
-    expect(consoleSource).toContain('disabled={rankIsReadOnly} value={noteDraft.comment}');
-    expect(consoleSource).toContain('disabled={rankIsReadOnly || noteState ===');
+    expect(consoleSource).toContain('disabled={rankIsReadOnly} type="text" inputMode="decimal"');
+    expect(consoleSource).toContain("disabled={rankIsReadOnly || amountState === 'saving'");
     expect(migration).toContain("raise exception 'Active unvalidated visit unavailable for this CDR'");
   });
 
