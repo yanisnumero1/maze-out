@@ -172,10 +172,10 @@ export function HostessConsole({ tables: initialTables, initialScreen = 'zones' 
 
   useEffect(() => {
     const zoneId = searchParams.get('zone');
-    if (!zoneId || zone || tables.length === 0) return;
+    if (screen === 'overview' || !zoneId || zone || tables.length === 0) return;
     const requestedZone = zones.find((item) => item.id === zoneId);
     if (requestedZone) { setZone(requestedZone); setSelectedWaiterId(null); setScreen('waiters'); }
-  }, [searchParams, tables.length, zone, zones]);
+  }, [screen, searchParams, tables.length, zone, zones]);
 
   useEffect(() => {
     const tableNumber = searchParams.get('table');
@@ -342,7 +342,20 @@ export function HostessConsole({ tables: initialTables, initialScreen = 'zones' 
   const openOverviewRank = (item: Zone, headWaiterId: string) => { setZone(item); openRank(headWaiterId); };
   const backToColumns = () => { setEditing(null); setEditingMode(false); setChangingTable(false); setTransferring(false); setTransferTargetId(''); setTransferConfirm(false); };
   const backToWaiters = () => { setSelectedWaiterId(null); setScreen('waiters'); setNotice(''); };
-  const backToZones = () => router.push('/' as any);
+  const backToZones = () => {
+    setScreen('overview');
+    setZone(null);
+    setSelectedWaiterId(null);
+    setEditing(null);
+    setEditingMode(false);
+    setChangingTable(false);
+    setTransferring(false);
+    setTransferTargetId('');
+    setTransferConfirm(false);
+    setHandledTableParam(null);
+    setNotice('');
+    router.replace('/' as any);
+  };
   const zoneState = zoneAvailabilityStatus(zoneSummary.present, zone?.max_capacity, zoneSummary.available);
   const zoneLabel = zoneState === 'complete' ? 'COMPLET' : zoneState === 'charged' ? 'CHARGÉ' : 'OUVERT';
   const columnGrid = waiters.length === 1 ? 'grid gap-4' : waiters.length === 2 ? 'grid gap-4 md:grid-cols-2' : 'grid gap-4 md:grid-cols-2 xl:grid-cols-3';

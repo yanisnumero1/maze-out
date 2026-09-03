@@ -115,8 +115,10 @@ describe('vue salle Hôtesse par CDR', () => {
     expect(hostess).toContain("searchParams.get('zone')");
   });
 
-  it('retourne à l’accueil Live depuis une vue de carré', () => {
+  it('retourne à l’accueil opérationnel depuis une vue de carré', () => {
     expect(hostess).toContain("import { useRouter, useSearchParams } from 'next/navigation'");
-    expect(hostess).toContain("const backToZones = () => router.push('/' as any)");
+    expect(hostess).toContain("setScreen('overview')");
+    expect(hostess).toContain('setZone(null)');
+    expect(hostess).toContain("router.replace('/' as any)");
   });
 });
