@@ -73,6 +73,37 @@ describe('checkpoint personnel du rang CDR', () => {
     expect(consoleSource).toContain('window.print()');
   });
 
+  it('demande une seconde confirmation explicite avant d’appeler la RPC', () => {
+    const firstAction = consoleSource.slice(consoleSource.indexOf('ref={rankValidationTriggerRef}'), consoleSource.indexOf('rankValidationDialogOpen &&'));
+    const confirmation = consoleSource.slice(consoleSource.indexOf('rankValidationDialogOpen &&'), consoleSource.indexOf('recapNightId && selectedRankStatus?.is_read_only && <section'));
+    expect(firstAction).toContain('setRankValidationDialogOpen(true)');
+    expect(firstAction).not.toContain('validateRank()');
+    expect(confirmation).toContain('role="dialog"');
+    expect(confirmation).toContain('aria-modal="true"');
+    expect(confirmation).toContain('Après validation, vous ne pourrez plus modifier');
+    expect(confirmation).toContain('CONFIRMER ET VERROUILLER MON RANG');
+    expect(confirmation).toContain('onClick={() => void validateRank()}');
+  });
+
+  it('annule sans RPC et bloque le double-submit pendant la validation', () => {
+    const validation = consoleSource.slice(consoleSource.indexOf('async function validateRank'), consoleSource.indexOf('function exportRankRecapPdf'));
+    expect(consoleSource).toContain('onClick={closeRankValidationDialog}');
+    expect(consoleSource).toContain("event.key === 'Escape' && rankValidationState !== 'saving'");
+    expect(validation).toContain("if (rankValidationState === 'saving') return");
+    expect(validation.match(/rpc\('validate_cdr_rank'\)/g)).toHaveLength(1);
+    expect(consoleSource).toContain("rankValidationState === 'saving' ? 'Validation en cours…'");
+    expect(consoleSource).toContain("disabled={rankValidationState === 'saving'}");
+  });
+
+  it('confirme le succès sans masquer une erreur backend', () => {
+    const validation = consoleSource.slice(consoleSource.indexOf('async function validateRank'), consoleSource.indexOf('function exportRankRecapPdf'));
+    expect(validation).toContain("setRankValidationState('error')");
+    expect(validation).not.toContain("setRankValidationDialogOpen(false);\n      setRankValidationState('error')");
+    expect(validation).toContain("setRankValidationMessage('Votre rang a été validé et verrouillé.')");
+    expect(validation).toContain('setRankValidationDialogOpen(false)');
+    expect(consoleSource).toContain('Validation impossible : {rankValidationMessage}');
+  });
+
   it('limite Mon journal à la soirée active et ne supprime aucun audit', () => {
     expect(consoleSource).toContain(".eq('night_session_id', activeNightId)");
     expect(consoleSource).toContain('setJournal([])');

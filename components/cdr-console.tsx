@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { cdrLiveTableRows } from '@/lib/cdr-live';
 import { presentTotal, stats } from '@/lib/live';
@@ -46,6 +46,9 @@ export function CdrConsole() {
   const [rankStatuses, setRankStatuses] = useState<CdrRankStatus[]>([]);
   const [rankValidationState, setRankValidationState] = useState<ValidationState>('idle');
   const [rankValidationMessage, setRankValidationMessage] = useState('');
+  const [rankValidationDialogOpen, setRankValidationDialogOpen] = useState(false);
+  const rankValidationTriggerRef = useRef<HTMLButtonElement>(null);
+  const rankValidationCancelRef = useRef<HTMLButtonElement>(null);
   const [selectedRecapNightId, setSelectedRecapNightId] = useState<string | null>(null);
   const [name, setName] = useState('Chef de rang');
   const [loading, setLoading] = useState(true);
@@ -122,6 +125,16 @@ export function CdrConsole() {
     return () => { void supabase.removeChannel(channel); };
   }, [refresh]);
 
+  useEffect(() => {
+    if (!rankValidationDialogOpen) return;
+    rankValidationCancelRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && rankValidationState !== 'saving') closeRankValidationDialog();
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [rankValidationDialogOpen, rankValidationState]);
+
   const tableRows = useMemo(() => headWaiterId ? cdrLiveTableRows(tables, visits, headWaiterId) : [], [headWaiterId, tables, visits]);
   const summary = stats(tableRows.map(({ table }) => table));
   const visitsById = useMemo(() => new Map(visits.map((visit) => [visit.id, visit])), [visits]);
@@ -170,14 +183,22 @@ export function CdrConsole() {
   }
 
   async function validateRank() {
+    if (rankValidationState === 'saving') return;
     setRankValidationState('saving'); setRankValidationMessage('');
     const { error: validationError } = await supabase.rpc('validate_cdr_rank');
     if (validationError) {
       console.error('[CDR] Validation du rang impossible.', validationError);
       setRankValidationState('error'); setRankValidationMessage(validationError.message); return;
     }
-    setRankValidationState('saved'); setRankValidationMessage('Rang validé');
+    setRankValidationState('saved'); setRankValidationMessage('Votre rang a été validé et verrouillé.');
+    setRankValidationDialogOpen(false);
     await refresh();
+  }
+
+  function closeRankValidationDialog() {
+    if (rankValidationState === 'saving') return;
+    setRankValidationDialogOpen(false);
+    window.setTimeout(() => rankValidationTriggerRef.current?.focus(), 0);
   }
 
   function exportRankRecapPdf() {
@@ -198,7 +219,7 @@ export function CdrConsole() {
         {[['Tables', tableRows.length], ['Occupées', summary.occupied], ['Libres', summary.available], ['Personnes', summary.present]].map(([label, value]) => <article className="panel p-3" key={String(label)}><p className="text-xs text-zinc-400">{label}</p><p className="mt-1 text-2xl font-black">{value}</p></article>)}
       </section>
       <section className="panel mt-6 p-4" aria-label="Validation de mon rang">
-        {activeRankStatus?.validated_at ? <><p className="font-black text-emerald-300">Rang validé</p><p className="mt-1 text-sm text-zinc-400">Validé le {new Date(activeRankStatus.validated_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</p><p className="mt-2 text-sm text-zinc-400">Votre rang est désormais en lecture seule.</p></> : activeRankStatus ? <><p className="font-black">Validation de mon rang</p><p className="mt-1 text-sm text-zinc-400">Cette action verrouille définitivement vos notes et validations d’apporteur pour cette soirée.</p><button disabled={rankValidationState === 'saving'} onClick={() => void validateRank()} className="mt-4 min-h-11 rounded-xl bg-fuchsia-600 px-4 py-2 font-bold disabled:opacity-60">{rankValidationState === 'saving' ? 'Validation...' : 'VALIDER MON RANG'}</button>{rankValidationMessage && <p className={rankValidationState === 'error' ? 'mt-2 text-sm text-red-300' : 'mt-2 text-sm text-emerald-300'}>{rankValidationMessage}</p>}</> : <p className="text-sm text-zinc-400">Aucune soirée active. Les données historiques sont en lecture seule.</p>}
+        {activeRankStatus?.validated_at ? <><p className="font-black text-emerald-300">Rang validé</p><p className="mt-1 text-sm text-zinc-400">Validé le {new Date(activeRankStatus.validated_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</p><p className="mt-2 text-sm text-zinc-400">Votre rang est désormais en lecture seule.</p></> : activeRankStatus ? <><p className="font-black">Validation de mon rang</p><p className="mt-1 text-sm text-zinc-400">Cette action verrouille définitivement vos notes et validations d’apporteur pour cette soirée.</p><button ref={rankValidationTriggerRef} disabled={rankValidationState === 'saving'} onClick={() => { setRankValidationMessage(''); setRankValidationState('idle'); setRankValidationDialogOpen(true); }} className="mt-4 min-h-11 rounded-xl bg-fuchsia-600 px-4 py-2 font-bold disabled:opacity-60">VALIDER MON RANG</button>{rankValidationMessage && <p className={rankValidationState === 'error' ? 'mt-2 text-sm text-red-300' : 'mt-2 text-sm text-emerald-300'}>{rankValidationMessage}</p>}</> : <p className="text-sm text-zinc-400">Aucune soirée active. Les données historiques sont en lecture seule.</p>}
       </section>
       <section className="mt-6 grid gap-3 sm:grid-cols-2" aria-label="Mes tables">
         {tableRows.map(({ table, visit }) => {
@@ -243,7 +264,7 @@ export function CdrConsole() {
         <div className="mt-3 grid gap-3">{selectedRecapSales.length ? selectedRecapSales.map((sale) => <article className="rounded-xl border border-zinc-800 bg-zinc-900 p-3" key={sale.table_visit_id}><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-bold">Table {sale.final_table_number || sale.source_table_number || 'Non renseignée'}</p>{sale.sale_number !== null && <span className="rounded-full bg-zinc-800 px-2 py-1 text-xs text-zinc-300">Vente #{sale.sale_number}</span>}</div>{sale.final_table_number && sale.source_table_number && sale.final_table_number !== sale.source_table_number && <p className="mt-1 text-xs text-zinc-500">Table d’origine : {sale.source_table_number}</p>}<div className="mt-3 grid gap-2 text-sm"><p><span className="text-zinc-500">Réservation · </span>{sale.reservation_name || 'Non renseignée'}</p><p><span className="text-zinc-500">Conso · </span>{sale.consumption || 'Non renseignée'}</p><p><span className="text-zinc-500">Commentaire · </span>{sale.sale_comment || 'Non renseigné'}</p><p><span className="text-zinc-500">Note CDR · </span>{sale.cdr_comment || '—'}</p><p><span className="text-zinc-500">Apporteur d’affaires · </span>{sale.business_referrer_name || 'Non renseigné'}</p></div></article>) : <p className="text-sm text-zinc-400">Aucune vente pour cette soirée.</p>}</div>
       </section>
     </>}
-  </main>{recapNightId && selectedRankStatus?.is_read_only && <section className="cdr-print-report hidden" aria-label="Document PDF du récapitulatif du rang">
+  </main>{rankValidationDialogOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) closeRankValidationDialog(); }}><section role="dialog" aria-modal="true" aria-labelledby="rank-validation-dialog-title" aria-describedby="rank-validation-dialog-description" className="w-full max-w-lg rounded-2xl border border-red-500/40 bg-zinc-950 p-5 shadow-2xl sm:p-6"><p className="text-xs font-black uppercase tracking-[.2em] text-red-300">Action irréversible</p><h2 id="rank-validation-dialog-title" className="mt-2 text-xl font-black">Êtes-vous sûr de vouloir valider votre rang ?</h2><div id="rank-validation-dialog-description" className="mt-4 space-y-3 text-sm leading-6 text-zinc-300"><p>Après validation, vous ne pourrez plus modifier les informations des ventes de votre rang.</p><p>Vérifiez notamment les apporteurs d’affaires, réservations, consommations et commentaires avant de continuer.</p></div>{rankValidationState === 'error' && rankValidationMessage && <p className="mt-4 rounded-xl bg-red-500/10 p-3 text-sm text-red-300" role="alert">Validation impossible : {rankValidationMessage}</p>}<div className="mt-6 grid gap-3 sm:grid-cols-2"><button ref={rankValidationCancelRef} type="button" disabled={rankValidationState === 'saving'} onClick={closeRankValidationDialog} className="min-h-12 rounded-xl bg-zinc-800 px-4 py-3 font-bold disabled:cursor-wait disabled:opacity-60">ANNULER</button><button type="button" disabled={rankValidationState === 'saving'} onClick={() => void validateRank()} className="min-h-12 rounded-xl bg-red-600 px-4 py-3 font-black disabled:cursor-wait disabled:opacity-60">{rankValidationState === 'saving' ? 'Validation en cours…' : 'CONFIRMER ET VERROUILLER MON RANG'}</button></div></section></div>}{recapNightId && selectedRankStatus?.is_read_only && <section className="cdr-print-report hidden" aria-label="Document PDF du récapitulatif du rang">
     <header className="cdr-print-header"><p className="cdr-print-brand">MAZE-OUT</p><h1>Récapitulatif du rang</h1><div className="cdr-print-meta"><p><b>Chef de rang :</b> {name}</p><p><b>Soirée :</b> {nightLabel(selectedRankStatus.night_started_at)}</p><p><b>Statut :</b> {selectedRankStatus.validated_at ? `Rang validé à ${clock(selectedRankStatus.validated_at)}` : 'Non validé avant clôture'}</p></div></header>
     <section className="cdr-print-totals" aria-label="Totaux du rang"><div><b>{selectedRecapSales.length}</b><span>vente{selectedRecapSales.length !== 1 ? 's' : ''}</span></div><div><b>{selectedRecapSales.filter((sale) => sale.final_table_number && sale.source_table_number && sale.final_table_number !== sale.source_table_number).length}</b><span>transfert{selectedRecapSales.filter((sale) => sale.final_table_number && sale.source_table_number && sale.final_table_number !== sale.source_table_number).length !== 1 ? 's' : ''}</span></div></section>
     <section className="cdr-print-sales" aria-label="Ventes du rang">{selectedRecapSales.length ? selectedRecapSales.map((sale) => {
