@@ -38,10 +38,11 @@ describe('récapitulatif CDR limité à la soirée active', () => {
     expect(source).not.toContain('recap_snapshot');
   });
 
-  it('vide récap, journal et tables lorsqu’il n’existe plus de soirée active', () => {
+  it('vide récap et journal mais conserve le rang structurel lorsqu’il n’existe plus de soirée active', () => {
     expect(source).toContain('if (!activeNightId) {\n      setRankRecap([]);');
     expect(source).toContain('setJournal([])');
-    expect(source).toContain('activeRankStatus && headWaiterId ? cdrLiveTableRows');
+    expect(source).toContain('cdrLiveTableRows(tables, activeRankStatus ? visits : [], headWaiterId)');
+    expect(source).toContain('available: tableRows.length, present: 0');
     expect(source).toContain("table: 'night_sessions'");
   });
 

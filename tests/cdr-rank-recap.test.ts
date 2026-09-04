@@ -55,9 +55,9 @@ describe('V4 — récapitulatif sécurisé du rang CDR', () => {
   it('affiche uniquement le récapitulatif actif et un état vide sûr', () => {
     expect(consoleSource).toContain("rpc('get_cdr_rank_recap', { p_night_session_id: activeNightId })");
     expect(consoleSource).not.toContain("rpc('get_cdr_rank_recap', { p_night_session_id: null })");
-    expect(consoleSource).toContain('RÉCAPITULATIF DU RANG');
+    expect(consoleSource).toContain('RÉCAP APPORTEURS D’AFFAIRES');
     expect(consoleSource).toContain('Aucune soirée active.');
-    expect(consoleSource).toContain('Aucune transaction pour la soirée en cours.');
+    expect(consoleSource).toContain('Aucune vente pour la soirée en cours.');
     expect(consoleSource).toContain('grid gap-3');
   });
 

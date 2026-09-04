@@ -39,18 +39,17 @@ describe('notes et apporteur CDR sur une visite active', () => {
     expect(migration).toContain("nullif(btrim(coalesce(p_business_referrer, '')), '')");
   });
 
-  it('conserve les anciennes notes en lecture et sauvegarde le nouveau montant via sa RPC', () => {
+  it('conserve les anciennes notes en base et sauvegarde le montant via sa RPC', () => {
     expect(consoleSource).toContain("supabase.from('table_visits').select('*').is('ended_at', null)");
-    expect(consoleSource).toContain('{visit && <div');
+    expect(consoleSource).toContain('{selectedTable && <section');
     expect(consoleSource).toContain('Commentaire');
-    expect(consoleSource).toContain('Note CDR historique');
+    expect(consoleSource).not.toContain('Note CDR historique');
     expect(consoleSource).toContain("rpc('update_cdr_visit_amount'");
     expect(consoleSource).toContain('Enregistrement...');
     expect(consoleSource).toContain('Montant enregistré');
   });
 
-  it('distingue visuellement une table libre d’une table occupée', () => {
-    expect(consoleSource).toContain("occupied ? 'border-fuchsia-500/50 bg-fuchsia-950/30' : 'border-zinc-700 bg-zinc-900/80'");
-    expect(consoleSource).toContain("occupied ? 'OCCUPÉE' : 'LIBRE'");
+  it('distingue visuellement les états opérationnels dérivés', () => {
+    for (const label of ['LIBRE', 'À VÉRIFIER', 'À COMPLÉTER', 'PRÊTE', 'VERROUILLÉE']) expect(consoleSource).toContain(label);
   });
 });

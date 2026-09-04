@@ -25,7 +25,7 @@ describe('checkpoint personnel du rang CDR', () => {
   it('verrouille les notes après validation du rang côté SQL et interface', () => {
     expect(consoleSource).toContain('const rankIsReadOnly = Boolean(activeRankStatus?.is_read_only)');
     expect(consoleSource).toContain('disabled={rankIsReadOnly} type="text" inputMode="decimal"');
-    expect(consoleSource).toContain("disabled={rankIsReadOnly || amountState === 'saving'");
+    expect(consoleSource).toContain("disabled={rankIsReadOnly || selectedAmountState === 'saving'");
     expect(migration).toContain("raise exception 'Active unvalidated visit unavailable for this CDR'");
   });
 
@@ -33,7 +33,7 @@ describe('checkpoint personnel du rang CDR', () => {
     const referrer = sqlFunction('validate_cdr_business_referrer', 'get_cdr_rank_status');
     expect(referrer).toContain('not exists (');
     expect(referrer).toContain('rv.head_waiter_id = v_head_waiter_id');
-    expect(consoleSource).toContain('disabled={rankIsReadOnly || validationState ===');
+    expect(consoleSource).toContain('disabled={rankIsReadOnly || selectedValidationState ===');
   });
 
   it('laisse la clôture Admin indépendante avec zéro validation ou des validations partielles', () => {
@@ -67,7 +67,7 @@ describe('checkpoint personnel du rang CDR', () => {
     expect(consoleSource).toContain('Rang validé');
     expect(consoleSource).toContain('activeRankStatus.validated_at');
     expect(consoleSource).toContain("toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })");
-    expect(consoleSource).toContain('RÉCAPITULATIF DU RANG');
+    expect(consoleSource).toContain('RÉCAP APPORTEURS D’AFFAIRES');
     expect(consoleSource).toContain("selectedRankStatus?.night_status === 'active'");
     expect(consoleSource).toContain('Exporter en PDF');
     expect(consoleSource).toContain('window.print()');

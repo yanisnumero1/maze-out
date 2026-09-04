@@ -10,33 +10,33 @@ const cdrMigration = file('supabase/migrations/0028_cdr_visit_notes.sql');
 
 describe('V4 — validation apporteur et journal CDR', () => {
   it('affiche les informations de vente Hôtesse sur une visite active', () => {
-    for (const field of ['visit.reservation_name', 'visit.consumption', 'visit.sale_comment', 'visit.proposed_business_referrer_name']) {
+    for (const field of ['selectedVisit.reservation_name', 'selectedVisit.consumption', 'selectedVisit.sale_comment', 'selectedVisit.proposed_business_referrer_name']) {
       expect(consoleSource).toContain(field);
     }
-    expect(consoleSource).toContain('Aucun apporteur proposé');
+    expect(consoleSource).toContain('Aucune proposition');
   });
 
   it('charge les apporteurs canoniques actifs et accepte une saisie libre', () => {
     expect(consoleSource).toContain("from('business_referrers').select('*').eq('active', true).order('name')");
-    expect(consoleSource).toContain('Rechercher ou saisir un apporteur...');
+    expect(consoleSource).toContain('Rechercher ou saisir...');
     expect(consoleSource).toContain('role="combobox"');
     expect(consoleSource).toContain('role="listbox"');
-    expect(consoleSource).toContain('matchingReferrers.map((referrer)');
-    expect(consoleSource).toContain('normalizeReferrerName(referrer.name).includes(normalizedInput)');
+    expect(consoleSource).toContain('selectedMatchingReferrers.map((referrer)');
+    expect(consoleSource).toContain('normalizeReferrerName(referrer.name).includes(selectedNormalizedInput)');
   });
 
   it('sélectionne un existant ou propose la création seulement à la validation explicite', () => {
-    expect(consoleSource).toContain('setValidatedReferrers((current) => ({ ...current, [visit.id]: referrer.name }))');
-    expect(consoleSource).toContain('normalizedInput && !hasExactReferrer');
-    expect(consoleSource).toContain('+ Ajouter « {referrerInput.trim().replace(/\\s+/g');
-    expect(consoleSource).toContain('onClick={() => void validateBusinessReferrer(visit)}');
+    expect(consoleSource).toContain('setValidatedReferrers((current) => ({ ...current, [selectedVisit.id]: referrer.name }))');
+    expect(consoleSource).toContain('selectedNormalizedInput && !selectedHasExactReferrer');
+    expect(consoleSource).toContain('+ Ajouter « {selectedReferrerInput.trim().replace(/\\s+/g');
+    expect(consoleSource).toContain('onClick={() => void validateBusinessReferrer(selectedVisit)}');
     expect(consoleSource).not.toContain("from('business_referrers').insert");
     expect(consoleSource).not.toContain("from('business_referrers').upsert");
   });
 
   it('préserve la proposition Hôtesse et rafraîchit le nom canonique après validation', () => {
     expect(consoleSource).toContain('Proposé par l’Hôtesse');
-    expect(consoleSource).toContain('visit.proposed_business_referrer_name');
+    expect(consoleSource).toContain('selectedVisit.proposed_business_referrer_name');
     expect(consoleSource).toContain('loadedReferrers.find((referrer) => referrer.id === visit.business_referrer_id)?.name ?? current[visit.id]');
     const validation = consoleSource.slice(consoleSource.indexOf('async function validateBusinessReferrer'), consoleSource.indexOf('async function validateRank'));
     expect(validation).toContain('await refresh()');
@@ -52,7 +52,7 @@ describe('V4 — validation apporteur et journal CDR', () => {
   });
 
   it('rend explicitement la validation et la correction', () => {
-    expect(consoleSource).toContain("hasValidatedReferrer ? 'Corriger l’apporteur' : 'Valider l’apporteur'");
+    expect(consoleSource).toContain("selectedHasValidatedReferrer ? 'Corriger l’apporteur' : 'Valider l’apporteur'");
     expect(consoleSource).toContain('Validé : ${referrerName}');
     expect(v4Migration).toContain("'cdr.business_referrer.validated', 'cdr.business_referrer.corrected'");
   });
@@ -68,8 +68,8 @@ describe('V4 — validation apporteur et journal CDR', () => {
     expect(v4Migration).toContain('and actor_id = auth.uid()');
   });
 
-  it('préserve la note CDR historique dans sa RPC dédiée', () => {
-    expect(consoleSource).toContain('Note CDR historique');
+  it('préserve la note CDR historique dans sa RPC dédiée sans la prioriser dans l’outil courant', () => {
+    expect(consoleSource).not.toContain('Note CDR historique');
     expect(cdrMigration).toContain('set cdr_comment = v_comment');
     expect(cdrMigration).toContain('business_referrer = v_referrer');
   });
@@ -91,9 +91,9 @@ describe('V4 — validation apporteur et journal CDR', () => {
   });
 
   it('préserve les états vides et le responsive mobile', () => {
-    expect(consoleSource).toContain('Aucune action enregistrée pour le moment.');
-    expect(consoleSource).toContain('Aucune table active ne vous est actuellement attribuée.');
-    expect(consoleSource).toContain('grid grid-cols-2 gap-3 sm:grid-cols-4');
+    expect(consoleSource).toContain('Aucune action pour la soirée en cours.');
+    expect(consoleSource).toContain('Aucune table ne vous est structurellement attribuée.');
+    expect(consoleSource).toContain('grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8');
     expect(consoleSource).toContain('sm:grid-cols-2');
   });
 

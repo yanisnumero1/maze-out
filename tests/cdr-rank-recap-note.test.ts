@@ -42,7 +42,7 @@ describe('V4 — note CDR dans le récapitulatif du rang', () => {
     expect(types).toContain('sale_comment: string | null;');
     expect(types).toContain('cdr_comment: string | null;');
     expect(consoleSource).not.toContain('selectedRecapSales.map');
-    expect(consoleSource).toContain('Note CDR historique');
+    expect(consoleSource).not.toContain('Note CDR historique');
   });
 
   it('recharge le récapitulatif après la sauvegarde et à la clôture de soirée', () => {

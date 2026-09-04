@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cdrLiveTableRows } from '@/lib/cdr-live';
+import { cdrLiveTableRows, cdrTableOperationalState } from '@/lib/cdr-live';
 import { getTableDisplayNumber } from '@/lib/tables';
 import type { HeadWaiter, LiveTable, TableVisit, Zone } from '@/lib/types';
 
@@ -47,5 +47,15 @@ describe('liste Live CDR fondée sur les tables affectées', () => {
     expect(getTableDisplayNumber({ ...table('uuid-display', '01', samir), display_number: '1' })).toBe('1');
     expect(getTableDisplayNumber(table('uuid-op', 'OP-1-alhan-01', samir))).toBe('OP-1-alhan-01');
     expect(getTableDisplayNumber(table('uuid-zero', '01', samir))).not.toBe('1');
+  });
+
+  it('dérive des états opérationnels sans créer une validation de table', () => {
+    const baseVisit = visit('visit-state', 'table-1');
+    expect(cdrTableOperationalState(null, false)).toBe('free');
+    expect(cdrTableOperationalState(baseVisit, false)).toBe('check');
+    expect(cdrTableOperationalState({ ...baseVisit, business_referrer_id: 'referrer' }, false)).toBe('complete');
+    expect(cdrTableOperationalState({ ...baseVisit, cdr_amount: 150 }, false)).toBe('complete');
+    expect(cdrTableOperationalState({ ...baseVisit, business_referrer_id: 'referrer', cdr_amount: 150 }, false)).toBe('ready');
+    expect(cdrTableOperationalState(baseVisit, true)).toBe('locked');
   });
 });
