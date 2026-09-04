@@ -38,4 +38,8 @@ export function cdrReferrerAmountSummary(sales: CdrRankRecapSale[]): CdrReferrer
 
 export const cdrRankTotalAmount = (rows: CdrReferrerAmountSummary[]): number => Math.round(rows.reduce((total, row) => total + row.totalAmount, 0) * 100) / 100;
 
-export const formatCdrAmount = (amount: number): string => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: Number.isInteger(amount) ? 0 : 2 }).format(amount);
+export const formatCdrAmount = (amount: number): string => new Intl.NumberFormat('fr-FR', {
+  style: 'decimal',
+  minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+  maximumFractionDigits: 2,
+}).format(amount);

@@ -60,7 +60,7 @@ describe('checkpoint personnel du rang CDR', () => {
     const status = sqlFunction('get_cdr_rank_status');
     expect(status).toContain("when n.ended_at is not null then 'Non validé avant clôture'");
     expect(status).toContain("when rv.validated_at is not null then 'Rang validé'");
-    expect(consoleSource).toContain("'Non validé avant clôture'");
+    expect(consoleSource).not.toContain("'Non validé avant clôture'");
   });
 
   it('affiche Rang validé avec sa date et garde le récapitulatif consultable', () => {
@@ -68,14 +68,14 @@ describe('checkpoint personnel du rang CDR', () => {
     expect(consoleSource).toContain('activeRankStatus.validated_at');
     expect(consoleSource).toContain("toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })");
     expect(consoleSource).toContain('RÉCAPITULATIF DU RANG');
-    expect(consoleSource).toContain('selectedRankStatus?.is_read_only');
+    expect(consoleSource).toContain("selectedRankStatus?.night_status === 'active'");
     expect(consoleSource).toContain('Exporter en PDF');
     expect(consoleSource).toContain('window.print()');
   });
 
   it('demande une seconde confirmation explicite avant d’appeler la RPC', () => {
     const firstAction = consoleSource.slice(consoleSource.indexOf('ref={rankValidationTriggerRef}'), consoleSource.indexOf('rankValidationDialogOpen &&'));
-    const confirmation = consoleSource.slice(consoleSource.indexOf('rankValidationDialogOpen &&'), consoleSource.indexOf('recapNightId && selectedRankStatus?.is_read_only && <section'));
+    const confirmation = consoleSource.slice(consoleSource.indexOf('rankValidationDialogOpen &&'), consoleSource.indexOf("recapNightId && selectedRankStatus?.night_status === 'active' && selectedRankStatus.validated_at && <section"));
     expect(firstAction).toContain('setRankValidationDialogOpen(true)');
     expect(firstAction).not.toContain('validateRank()');
     expect(confirmation).toContain('role="dialog"');

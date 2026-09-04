@@ -8,10 +8,10 @@ const styles = file('app/globals.css');
 const migration = file('supabase/migrations/0036_cdr_rank_personal_checkpoint.sql');
 
 describe('export PDF personnel du rang CDR', () => {
-  it('masque le bouton avant validation et l’affiche après validation ou clôture', () => {
-    expect(consoleSource).toContain("selectedRankStatus?.is_read_only && <button type=\"button\" onClick={exportRankRecapPdf}");
+  it('masque le bouton avant validation ou après clôture et l’affiche pendant la soirée active validée', () => {
+    expect(consoleSource).toContain("selectedRankStatus?.night_status === 'active' && selectedRankStatus.validated_at && <button type=\"button\" onClick={exportRankRecapPdf}");
+    expect(consoleSource).toContain("if (!recapNightId || selectedRankStatus?.night_status !== 'active' || !selectedRankStatus.validated_at) return;");
     expect(consoleSource).toContain('Exporter en PDF');
-    expect(migration).toContain('n.ended_at is not null or rv.validated_at is not null');
   });
 
   it('lance l’impression navigateur sans dépendance PDF ni infrastructure serveur', () => {
@@ -22,25 +22,24 @@ describe('export PDF personnel du rang CDR', () => {
     expect(consoleSource).not.toContain('Exporter CSV');
   });
 
-  it('imprime le CDR, la soirée et le bon statut historique', () => {
-    expect(consoleSource).toContain('<b>Chef de rang :</b> {name}');
+  it('imprime uniquement l’identité, la date et les agrégats utiles', () => {
+    expect(consoleSource).toContain('<b>CDR :</b> {name}');
     expect(consoleSource).toContain('nightLabel(selectedRankStatus.night_started_at)');
-    expect(consoleSource).toContain('Rang validé à ${clock(selectedRankStatus.validated_at)}');
-    expect(consoleSource).toContain("'Non validé avant clôture'");
+    expect(consoleSource).toContain('cdr-print-referrers');
   });
 
-  it('inclut les ventes, transferts, notes et données commerciales du rang', () => {
+  it('exclut du document les détails de transaction', () => {
+    const printable = consoleSource.slice(consoleSource.indexOf('className="cdr-print-report hidden"'));
     for (const value of ['selectedRecapSales.map', 'sale.source_table_number', 'sale.final_table_number', 'sale.sale_number', 'sale.reservation_name', 'sale.consumption', 'sale.sale_comment', 'sale.cdr_comment']) {
-      expect(consoleSource).toContain(value);
+      expect(printable).not.toContain(value);
     }
-    expect(consoleSource).toContain('Commentaire de vente');
-    expect(consoleSource).toContain('Note CDR');
+    expect(printable).not.toContain('Commentaire de vente');
+    expect(printable).not.toContain('Note CDR');
   });
 
-  it('préfère l’apporteur validé et utilise la proposition uniquement en repli', () => {
-    expect(consoleSource).toContain("sale.business_referrer_name || sale.proposed_business_referrer_name || 'Non renseigné'");
-    expect(consoleSource).toContain("sale.business_referrer_name ? 'Apporteur validé' : 'Apporteur proposé'");
-    expect(migration).toContain('v.proposed_business_referrer_name');
+  it('utilise l’agrégation canonique sans proposition Hôtesse', () => {
+    expect(consoleSource).toContain('cdrReferrerAmountSummary(selectedRecapSales)');
+    expect(consoleSource).toContain('row.businessReferrerName');
   });
 
   it('reste strictement limité au CDR connecté par la RPC existante', () => {
@@ -50,12 +49,18 @@ describe('export PDF personnel du rang CDR', () => {
     expect(consoleSource).not.toContain("from('table_visits').select('*').eq('final_head_waiter_id'");
   });
 
-  it('produit une vue A4 sans navigation ni boutons et protège chaque vente des coupures', () => {
+  it('produit une vue A4 sans navigation ni boutons et protège chaque ligne des coupures', () => {
     expect(styles).toContain('@page { size: A4; margin: 14mm; }');
     expect(styles).toContain('body * { visibility: hidden !important; }');
     expect(styles).toContain('.cdr-print-report, .cdr-print-report * { visibility: visible !important; }');
     expect(styles).toContain('break-inside: avoid');
     expect(consoleSource).toContain('className="cdr-print-report hidden"');
+  });
+
+  it('n’affiche aucun symbole ou code monétaire dans le document', () => {
+    const printable = consoleSource.slice(consoleSource.indexOf('className="cdr-print-report hidden"'));
+    expect(printable).not.toContain('€');
+    expect(printable).not.toMatch(/(^|[^A-Z])EUR([^A-Z]|$)/);
   });
 
   it('conserve les protections de validation et verrouillage existantes', () => {

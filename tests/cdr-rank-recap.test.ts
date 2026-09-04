@@ -40,8 +40,8 @@ describe('V4 — récapitulatif sécurisé du rang CDR', () => {
     for (const field of ['v.reservation_name', 'v.consumption', 'v.sale_comment', 'referrer.name']) {
       expect(migration).toContain(field);
     }
-    expect(consoleSource).toContain("sale.business_referrer_name || 'Non renseigné'");
-    expect(consoleSource).toContain("sale.consumption || 'Non renseignée'");
+    expect(consoleSource).toContain('cdrReferrerAmountSummary(selectedRecapSales)');
+    expect(consoleSource).not.toContain('selectedRecapSales.map');
   });
 
   it('reste une frontière SECURITY DEFINER limitée et correctement accordée', () => {
@@ -52,11 +52,12 @@ describe('V4 — récapitulatif sécurisé du rang CDR', () => {
     expect(migration).not.toContain('p_head_waiter_id');
   });
 
-  it('affiche des cartes compactes, une soirée sélectionnable et un état vide sûr', () => {
-    expect(consoleSource).toContain("rpc('get_cdr_rank_recap', { p_night_session_id: null })");
+  it('affiche uniquement le récapitulatif actif et un état vide sûr', () => {
+    expect(consoleSource).toContain("rpc('get_cdr_rank_recap', { p_night_session_id: activeNightId })");
+    expect(consoleSource).not.toContain("rpc('get_cdr_rank_recap', { p_night_session_id: null })");
     expect(consoleSource).toContain('RÉCAPITULATIF DU RANG');
-    expect(consoleSource).toContain('Soirée clôturée — lecture seule');
-    expect(consoleSource).toContain('Aucune vente pour cette soirée.');
+    expect(consoleSource).toContain('Aucune soirée active.');
+    expect(consoleSource).toContain('Aucune transaction pour la soirée en cours.');
     expect(consoleSource).toContain('grid gap-3');
   });
 

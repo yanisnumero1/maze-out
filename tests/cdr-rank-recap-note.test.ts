@@ -38,25 +38,25 @@ describe('V4 — note CDR dans le récapitulatif du rang', () => {
     expect(migration).toContain('create function public.get_cdr_rank_recap(');
   });
 
-  it('garde sale_comment et cdr_comment distincts dans le type et le rendu', () => {
+  it('garde sale_comment et cdr_comment distincts dans le contrat sans les exposer dans le récap simplifié', () => {
     expect(types).toContain('sale_comment: string | null;');
     expect(types).toContain('cdr_comment: string | null;');
-    expect(consoleSource).toContain("sale.sale_comment || 'Non renseigné'");
-    expect(consoleSource).toContain('sale.cdr_comment &&');
+    expect(consoleSource).not.toContain('selectedRecapSales.map');
     expect(consoleSource).toContain('Note CDR historique');
   });
 
-  it('recharge le récapitulatif après la sauvegarde du montant, sans abonnement additionnel', () => {
+  it('recharge le récapitulatif après la sauvegarde et à la clôture de soirée', () => {
     const saveAmount = consoleSource.slice(consoleSource.indexOf('async function saveAmount'), consoleSource.indexOf('async function validateBusinessReferrer'));
     expect(saveAmount).toContain("rpc('update_cdr_visit_amount'");
     expect(saveAmount).toContain('await refresh();');
-    expect(consoleSource).not.toContain("table: 'night_sessions'");
+    expect(consoleSource).toContain("table: 'night_sessions'");
   });
 
-  it('conserve la consultation des notes après clôture en lecture seule', () => {
+  it('conserve les notes historiques en base sans réafficher la soirée clôturée', () => {
     expect(migration).toContain("case when n.ended_at is null then 'active' else 'closed' end");
     expect(migration).toContain('n.ended_at is not null');
-    expect(consoleSource).toContain('Soirée clôturée — lecture seule');
+    expect(consoleSource).toContain('setRankRecap([])');
+    expect(consoleSource).toContain('Aucune soirée active.');
   });
 
   it('ne modifie aucune RLS ni la validation d’apporteur', () => {

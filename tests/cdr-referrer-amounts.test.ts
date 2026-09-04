@@ -38,7 +38,10 @@ describe('montants CDR par apporteur', () => {
       { businessReferrerId: 'sofiane', businessReferrerName: 'Sofiane Club', saleCount: 1, totalAmount: 800 },
     ]);
     expect(cdrRankTotalAmount(rows)).toBe(2050);
-    expect(formatCdrAmount(1250.5)).toMatch(/1[\s\u00a0\u202f]250,50\s€/);
+    expect(formatCdrAmount(150)).toBe('150');
+    expect(formatCdrAmount(150.5)).toBe('150,50');
+    expect(formatCdrAmount(1250.5)).toMatch(/^1[\s\u00a0\u202f]250,50$/);
+    expect(formatCdrAmount(1250.5)).not.toMatch(/€|EUR/);
   });
 
   it('ajoute un numeric dédié sans convertir ni supprimer cdr_comment', () => {
@@ -81,7 +84,7 @@ describe('montants CDR par apporteur', () => {
   });
 
   it('affiche le récap avant/après validation, les anomalies et le PDF', () => {
-    for (const text of ['MONTANT', 'RÉCAP APPORTEURS', 'RÉCAP APPORTEURS D’AFFAIRES', 'TOTAL DU RANG', 'unlinkedPositiveSales']) expect(consoleSource).toContain(text);
+    for (const text of ['MONTANT', 'RÉCAP APPORTEURS', 'RÉCAP APPORTEURS D’AFFAIRES', 'TOTAL', 'unlinkedPositiveSales']) expect(consoleSource).toContain(text);
     expect(consoleSource).toContain("disabled={rankValidationState === 'saving' || unlinkedPositiveSales.length > 0}");
     expect(consoleSource).toContain('aria-label="Récap apporteurs d’affaires"');
     expect(consoleSource).toContain('formatCdrAmount(rankTotalAmount)');
