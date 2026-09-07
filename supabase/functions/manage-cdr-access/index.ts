@@ -5,12 +5,12 @@ import {
   isSecureTemporaryPassword,
   technicalEmailToCdrUsername,
 } from '../_shared/cdr-access.ts';
+import { corsPreflightResponse, JSON_HEADERS } from '../_shared/cors.ts';
 
 type Action = 'list' | 'create' | 'reset_password' | 'disable' | 'enable';
 type RequestBody = { action?: Action; headWaiterId?: string; username?: string };
 type Profile = { id: string; role: string; head_waiter_id: string | null; cdr_access_disabled_at: string | null };
 
-const JSON_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' };
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function serviceKey(): string | undefined {
@@ -102,7 +102,7 @@ async function listAccesses(client: SupabaseClient): Promise<Response> {
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') {
-    return new Response(null, { headers: { ...JSON_HEADERS, 'Access-Control-Allow-Headers': 'authorization, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' } });
+    return corsPreflightResponse();
   }
   if (request.method !== 'POST') return failure(405, 'invalid_request');
 

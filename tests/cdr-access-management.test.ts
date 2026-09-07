@@ -10,6 +10,7 @@ import {
   suggestCdrUsername,
   technicalEmailToCdrUsername,
 } from '@/supabase/functions/_shared/cdr-access';
+import { CORS_HEADERS, JSON_HEADERS, corsPreflightResponse } from '@/supabase/functions/_shared/cors';
 
 const source = (file: string) => readFileSync(resolve(process.cwd(), file), 'utf8');
 const edge = source('supabase/functions/manage-cdr-access/index.ts');
@@ -46,6 +47,19 @@ describe('gestion Admin des accès CDR', () => {
     expect(edge).toContain("callerProfile?.role !== 'admin'");
     expect(edge.indexOf("callerProfile?.role !== 'admin'")).toBeLessThan(edge.indexOf("if (body.action === 'list')"));
     expect(edge).toContain("return failure(403, 'admin_required')");
+  });
+
+  it('accepte le preflight supabase-js et conserve le même contrat CORS sur les réponses JSON', () => {
+    const requestedHeaders = ['authorization', 'apikey', 'content-type', 'x-client-info'];
+    const allowedHeaders = CORS_HEADERS['Access-Control-Allow-Headers'].split(',').map((header) => header.trim());
+    expect(requestedHeaders.every((header) => allowedHeaders.includes(header))).toBe(true);
+    const preflight = corsPreflightResponse();
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get('Access-Control-Allow-Headers')).toContain('x-client-info');
+    for (const [header, value] of Object.entries(CORS_HEADERS)) expect(JSON_HEADERS[header as keyof typeof JSON_HEADERS]).toBe(value);
+    expect(edge).toContain("import { corsPreflightResponse, JSON_HEADERS } from '../_shared/cors.ts'");
+    expect(edge).toContain('return corsPreflightResponse()');
+    expect(edge).toContain('headers: JSON_HEADERS');
   });
 
   it('garde la clé privilégiée et les mots de passe exclusivement côté serveur', () => {

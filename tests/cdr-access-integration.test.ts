@@ -24,7 +24,7 @@ describe.skipIf(!enabled)('gestion CDR avec Supabase local', () => {
   async function invoke(token: string, body: Record<string, unknown>) {
     const request = await fetch(`${localUrl}/functions/v1/manage-cdr-access`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, apikey: anonKey, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${token}`, apikey: anonKey, 'Content-Type': 'application/json', 'x-client-info': 'supabase-js-integration-test' },
       body: JSON.stringify(body),
     });
     return { status: request.status, body: await request.json() as Record<string, any> };
