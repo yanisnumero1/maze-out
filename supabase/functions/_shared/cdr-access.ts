@@ -64,4 +64,3 @@ function secureRandomValues(length: number): Uint32Array {
 function pick(source: string, randomValues: (length: number) => Uint32Array): string {
   return source[Number(randomValues(1)[0] % source.length)];
 }
-

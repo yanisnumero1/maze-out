@@ -25,13 +25,14 @@ export function AuthGate({ children, requireAdmin = false, requireCdr = false }:
 
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, cdr_access_disabled_at')
         .eq('id', session.user.id)
         .single();
 
       const role = profile?.role as AppRole | undefined;
-      if (error || (role !== 'admin' && role !== 'hostess' && role !== 'cdr')) {
+      if (error || profile?.cdr_access_disabled_at || (role !== 'admin' && role !== 'hostess' && role !== 'cdr')) {
         console.error('[AUTH] Profil invalide ou inaccessible.', error);
+        if (profile?.cdr_access_disabled_at) await supabase.auth.signOut();
         if (active) router.replace('/login' as any);
         return;
       }

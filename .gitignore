@@ -6,3 +6,10 @@ node_modules/
 .env.*
 !.env.example
 !.env.*.example
+
+# Fichiers locaux et temporaires
+.DS_Store
+supabase/.temp/
+.tmp-maze-presentation/
+*.pptx.inspect.ndjson
+MAZE-OUT_Presentation_Entretien/

@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  application:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: TypeScript
+        run: npx tsc --noEmit
+      - name: Unit tests
+        run: npm run test
+      - name: Production build
+        run: npm run build
+
+  cdr-access-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Start local Supabase
+        run: |
+          mkdir -p .tmp/ci
+          if ! timeout 10m npx supabase start >.tmp/ci/supabase-start.log 2>&1; then
+            echo "Local Supabase failed to start."
+            exit 1
+          fi
+      - name: Serve CDR access Edge Function
+        run: |
+          timeout 15m npx supabase functions serve manage-cdr-access >.tmp/ci/manage-cdr-access.log 2>&1 &
+          echo "$!" >.tmp/ci/manage-cdr-access.pid
+      - name: Wait for local services
+        run: |
+          api_ready=false
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error --max-time 2 http://127.0.0.1:54321/auth/v1/health >/dev/null; then
+              api_ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$api_ready" != true ]; then
+            echo "Local Supabase API did not become ready within 120 seconds."
+            exit 1
+          fi
+
+          function_ready=false
+          for attempt in $(seq 1 60); do
+            status_code="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 2 --request POST --header 'Content-Type: application/json' --data '{"action":"list"}' http://127.0.0.1:54321/functions/v1/manage-cdr-access || true)"
+            if [ "$status_code" = 401 ]; then
+              function_ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$function_ready" != true ]; then
+            echo "manage-cdr-access did not become ready within 120 seconds."
+            exit 1
+          fi
+      - name: Export isolated local Supabase variables
+        shell: bash
+        run: |
+          status_file="$(mktemp)"
+          timeout 1m npx supabase status -o env >"$status_file"
+          set -a
+          source "$status_file"
+          set +a
+          rm -f "$status_file"
+          : "${API_URL:?Local API_URL is missing}"
+          : "${ANON_KEY:?Local ANON_KEY is missing}"
+          : "${SERVICE_ROLE_KEY:?Local SERVICE_ROLE_KEY is missing}"
+          {
+            echo "RUN_CDR_ACCESS_INTEGRATION=1"
+            echo "SUPABASE_LOCAL_URL=$API_URL"
+            echo "SUPABASE_LOCAL_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_LOCAL_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+          } >>"$GITHUB_ENV"
+      - name: Run CDR access integration test
+        run: timeout 5m npm run test -- tests/cdr-access-integration.test.ts
+      - name: Show redacted Edge Function logs on failure
+        if: failure()
+        run: |
+          if [ -f .tmp/ci/manage-cdr-access.log ]; then
+            sed -E 's/eyJ[A-Za-z0-9._-]+/[REDACTED_JWT]/g; s/(SUPABASE_[A-Z_]+=)[^[:space:]]+/\1[REDACTED]/g' .tmp/ci/manage-cdr-access.log
+          else
+            echo "No Edge Function log file was produced."
+          fi
+      - name: Stop local Supabase
+        if: always()
+        run: |
+          if [ -f .tmp/ci/manage-cdr-access.pid ]; then
+            kill "$(cat .tmp/ci/manage-cdr-access.pid)" 2>/dev/null || true
+          fi
+          timeout 5m npx supabase stop --no-backup || true

@@ -46,8 +46,8 @@ async function profileForHeadWaiter(client: SupabaseClient, headWaiterId: string
     .select('id, role, head_waiter_id, cdr_access_disabled_at')
     .eq('head_waiter_id', headWaiterId);
   if (error) throw error;
-  if (data.length !== 1 || data[0].role !== 'cdr') return null;
-  return data[0] as Profile;
+  if ((data ?? []).length !== 1 || data![0].role !== 'cdr') return null;
+  return data![0] as Profile;
 }
 
 async function writeAudit(client: SupabaseClient, actorId: string, headWaiterId: string, actionType: string, metadata?: Record<string, unknown>) {
@@ -82,8 +82,10 @@ async function listAccesses(client: SupabaseClient): Promise<Response> {
     const profile = linked[0];
     const user = profile?.role === 'cdr' ? authUsers.get(profile.id) : null;
     const username = user ? technicalEmailToCdrUsername(user.email) : null;
-    const status = linked.length > 1 || (profile && (profile.role !== 'cdr' || !user || !username)) ? 'inconsistent'
-      : profile?.cdr_access_disabled_at ? 'disabled'
+    const authIsBanned = Boolean(user?.banned_until && new Date(user.banned_until).getTime() > Date.now());
+    const profileIsDisabled = Boolean(profile?.cdr_access_disabled_at);
+    const status = linked.length > 1 || (profile && (profile.role !== 'cdr' || !user || !username || authIsBanned !== profileIsDisabled)) ? 'inconsistent'
+      : profileIsDisabled ? 'disabled'
         : profile ? 'active'
           : 'none';
     return {
@@ -100,7 +102,7 @@ async function listAccesses(client: SupabaseClient): Promise<Response> {
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') {
-    return new Response(null, { headers: { ...JSON_HEADERS, 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type' } });
+    return new Response(null, { headers: { ...JSON_HEADERS, 'Access-Control-Allow-Headers': 'authorization, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' } });
   }
   if (request.method !== 'POST') return failure(405, 'invalid_request');
 
@@ -143,9 +145,10 @@ Deno.serve(async (request) => {
     if (body.action === 'create') {
       const email = cdrUsernameToEmail(body.username ?? '');
       if (!email) return failure(400, 'invalid_username');
-      const { data: linkedProfiles, error: linkedError } = await service.from('profiles').select('id').eq('head_waiter_id', waiter.id);
+      const { data: linkedProfiles, error: linkedError } = await service.from('profiles').select('id, role').eq('head_waiter_id', waiter.id);
       if (linkedError) throw linkedError;
-      if ((linkedProfiles ?? []).length > 0) return failure(409, 'already_linked');
+      if ((linkedProfiles ?? []).length > 1 || linkedProfiles?.some((profile) => profile.role !== 'cdr')) return failure(409, 'inconsistent_profile');
+      if ((linkedProfiles ?? []).length === 1) return failure(409, 'already_linked');
       if (await findUserByEmail(service, email)) return failure(409, 'username_taken');
 
       const temporaryPassword = generateTemporaryPassword();
@@ -167,7 +170,7 @@ Deno.serve(async (request) => {
       }).eq('id', created.user.id).select('id').maybeSingle();
       if (profileUpdateError || !updatedProfile) {
         await service.auth.admin.deleteUser(created.user.id);
-        return failure(409, profileUpdateError.code === '23505' ? 'already_linked' : 'inconsistent_profile');
+        return failure(409, profileUpdateError?.code === '23505' ? 'already_linked' : 'inconsistent_profile');
       }
       try {
         await writeAudit(service, callerData.user.id, waiter.id, 'cdr.access.created', { username: technicalEmailToCdrUsername(email) });

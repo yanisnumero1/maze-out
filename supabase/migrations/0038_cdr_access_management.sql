@@ -4,12 +4,19 @@
 alter table public.profiles
   add column if not exists cdr_access_disabled_at timestamptz;
 
+alter table public.profiles
+  drop constraint if exists profiles_cdr_access_disabled_role_check;
+alter table public.profiles
+  add constraint profiles_cdr_access_disabled_role_check check (
+    cdr_access_disabled_at is null or role = 'cdr'::public.app_role
+  );
+
 do $$
 begin
   if exists (
     select 1
     from public.profiles
-    where role::text = 'cdr' and head_waiter_id is not null
+    where role = 'cdr'::public.app_role and head_waiter_id is not null
     group by head_waiter_id
     having count(*) > 1
   ) then
@@ -20,7 +27,7 @@ $$;
 
 create unique index if not exists profiles_one_cdr_per_head_waiter_idx
   on public.profiles(head_waiter_id)
-  where role::text = 'cdr' and head_waiter_id is not null;
+  where role = 'cdr'::public.app_role and head_waiter_id is not null;
 
 create or replace function public.current_role()
 returns public.app_role
@@ -53,6 +60,15 @@ alter table public.operational_audit_log
     'hostess.visit.v4_updated',
     'cdr.access.created', 'cdr.access.password_reset', 'cdr.access.disabled', 'cdr.access.enabled'
   ));
+
+alter table public.operational_audit_log
+  drop constraint if exists operational_audit_log_scope_check;
+alter table public.operational_audit_log
+  add constraint operational_audit_log_scope_check check (
+    (action_type in ('cdr.access.created', 'cdr.access.password_reset', 'cdr.access.disabled', 'cdr.access.enabled') and night_session_id is null)
+    or
+    (action_type not in ('cdr.access.created', 'cdr.access.password_reset', 'cdr.access.disabled', 'cdr.access.enabled') and night_session_id is not null)
+  );
 
 comment on column public.profiles.cdr_access_disabled_at is
   'Verrou applicatif et RLS d’un accès CDR, sans suppression du profil ni de son historique.';
