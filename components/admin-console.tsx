@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { LiveTable } from '@/lib/types';
 import { supabase } from '@/lib/supabase/client';
 import { getTableDisplayNumber } from '@/lib/tables';
+import { CdrAccessAdmin } from '@/components/cdr-access-admin';
 
 const normalise = (rows: any[]): LiveTable[] => rows.map((table) => ({
   ...table,
@@ -78,6 +79,7 @@ export function AdminConsole({ tables }: { tables: LiveTable[] }) {
           </tr>)}</tbody>
         </table>
       </section>
+      <CdrAccessAdmin />
       <section className="mt-8 border border-red-500/30 bg-red-500/5 p-4 sm:p-5">
         <p className="text-sm font-bold uppercase tracking-[.2em] text-red-300">Zone de test</p>
         <h2 className="mt-1 text-xl font-black">Réinitialiser les données de test</h2>

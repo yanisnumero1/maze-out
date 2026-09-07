@@ -13,7 +13,7 @@ export function Navigation() {
   const searchParams = useSearchParams();
   const role = useAppRole();
 
-  const linkClass = (active: boolean) => `min-h-11 shrink-0 rounded-full px-2.5 py-2 text-center text-xs font-semibold sm:px-3 sm:text-sm ${active ? 'bg-fuchsia-600 text-white' : 'bg-zinc-800 text-zinc-100'}`;
+  const linkClass = (active: boolean) => `nav-link ${active ? 'nav-link-active' : ''}`;
 
   async function signOut() {
     const { error } = await supabase.auth.signOut();
@@ -22,12 +22,13 @@ export function Navigation() {
   }
 
   return <>
-    <nav className={`${role === 'hostess' ? 'mb-2' : 'mb-5'} border-b border-zinc-800 pb-3 text-sm`}>
-      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-      <Link href="/" className="mr-auto flex h-11 items-center">
-        <Image src="/bridge-logo.png" alt="BRIDGE — Pont Alexandre III" width={160} height={57} className="h-8 w-32 object-contain" />
+    <nav className={`topbar ${role === 'hostess' ? 'mb-2' : 'mb-5'}`}>
+      <div className="topbar-inner">
+      <Link href="/" className="brand-mark" aria-label="MAZE-OUT — Accueil">
+        <Image src="/bridge-logo.png" alt="BRIDGE — Pont Alexandre III" width={160} height={57} className="h-7 w-28 object-contain sm:h-8 sm:w-32" />
+        <span>MAZE-OUT</span>
       </Link>
-      <div className={role === 'hostess' ? '-mx-1 flex w-[calc(100%+0.5rem)] flex-nowrap gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:mx-0 sm:w-auto sm:justify-end sm:gap-2 sm:overflow-visible sm:px-0 sm:pb-0' : 'flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end'}>
+      <div className="nav-scroll">
         {role === 'cdr' ? <Link className={linkClass(pathname.startsWith('/cdr'))} href="/cdr">Live</Link> : <>
         <Link className={linkClass(pathname === '/' && searchParams.get('view') !== 'live')} href="/">Accueil</Link>
         {role === 'hostess' && <Link className={linkClass(pathname === '/' && searchParams.get('view') === 'live')} href={'/?view=live' as any}>Vue Live</Link>}
@@ -35,7 +36,7 @@ export function Navigation() {
         {role === 'admin' && <Link className={linkClass(pathname.startsWith('/admin'))} href="/admin">Administration</Link>}
         {role === 'admin' && <Link className={linkClass(pathname.startsWith('/recap'))} href={'/recap' as any}>Récapitulatif</Link>}
         </>}
-        <button className="min-h-11 shrink-0 rounded-full bg-zinc-800 px-2.5 py-2 text-xs font-semibold sm:px-3 sm:text-sm" onClick={() => void signOut()}>Se déconnecter</button>
+        <button className="signout-button" onClick={() => void signOut()}>Se déconnecter</button>
       </div>
       </div>
     </nav>

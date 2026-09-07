@@ -276,7 +276,7 @@ export function CdrConsole() {
     <header className="flex items-center gap-2.5 border-b border-zinc-800 pb-3">
       <Image src="/bridge-logo.png" alt="BRIDGE — Pont Alexandre III" width={112} height={40} className="h-7 w-20 shrink-0 object-contain sm:w-24" />
       <h1 className="min-w-0 flex-1 truncate text-base font-black sm:text-lg">Bonjour {name}</h1>
-      <button className="min-h-11 shrink-0 rounded-full bg-zinc-800 px-3 py-2 text-xs font-semibold sm:text-sm" onClick={() => void signOut()}>Déconnexion</button>
+      <button className="signout-button" onClick={() => void signOut()}>Déconnexion</button>
     </header>
     {loading ? <p className="panel mt-4 p-5 text-center text-sm text-zinc-400">Chargement de votre rang...</p> : error ? <p className="panel mt-4 p-5 text-center text-sm text-red-300">{error}</p> : <>
       <section className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-zinc-800 bg-zinc-900/70 px-3 py-2 text-xs sm:text-sm" aria-label="Résumé de mon rang">

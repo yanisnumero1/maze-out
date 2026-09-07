@@ -15,10 +15,13 @@ describe('passe responsive des interfaces opérationnelles', () => {
 
   it('replie la navigation et maintient des zones tactiles utilisables', () => {
     const navigation = source('components/navigation.tsx');
-    expect(navigation).toContain('flex flex-wrap items-center gap-1.5 sm:gap-2');
-    expect(navigation).toContain('flex-nowrap gap-1.5 overflow-x-auto');
+    const styles = source('app/globals.css');
+    expect(navigation).toContain('topbar-inner');
+    expect(navigation).toContain('nav-scroll');
     expect(navigation).toContain("role === 'hostess'");
-    expect(navigation).toContain('min-h-11');
+    expect(styles).toContain('.nav-scroll');
+    expect(styles).toContain('overflow-x: auto');
+    expect(styles).toContain('.nav-link, .signout-button { min-height: 2.5rem; }');
   });
 
   it('garde les actions et les cartes Live lisibles sur petits écrans', () => {
@@ -34,7 +37,8 @@ describe('passe responsive des interfaces opérationnelles', () => {
   it('rend les onglets, compteurs et transferts Hôtesse utilisables au tactile', () => {
     const hub = source('components/hostess-hub.tsx');
     const console = source('components/hostess-console.tsx');
-    expect(hub).toContain('snap-x gap-2 overflow-x-auto');
+    expect(hub).toContain('segmented-control');
+    expect(hub).toContain('overflow-x-auto');
     expect(console).toContain('max-h-[min(16rem,45dvh)]');
     expect(console).toContain('flex flex-col gap-2 sm:flex-row');
     expect(console).toContain('min-h-14 w-full');

@@ -59,9 +59,9 @@ export function AuthPanel() {
         void signIn();
       }}
     >
-      <div className="grid grid-cols-2 gap-2 rounded-xl bg-zinc-900 p-1" role="tablist" aria-label="Type de connexion">
-        <button type="button" role="tab" aria-selected={mode === 'team'} className={`min-h-11 rounded-lg px-3 text-sm font-semibold ${mode === 'team' ? 'bg-fuchsia-600 text-white' : 'text-zinc-300'}`} onClick={() => { setMode('team'); setNotice(''); }}>Équipe</button>
-        <button type="button" role="tab" aria-selected={mode === 'cdr'} className={`min-h-11 rounded-lg px-3 text-sm font-semibold ${mode === 'cdr' ? 'bg-fuchsia-600 text-white' : 'text-zinc-300'}`} onClick={() => { setMode('cdr'); setNotice(''); }}>Chef de rang</button>
+      <div className="segmented-control grid-cols-2" role="tablist" aria-label="Type de connexion">
+        <button type="button" role="tab" aria-selected={mode === 'team'} className={`segmented-option ${mode === 'team' ? 'segmented-option-active' : ''}`} onClick={() => { setMode('team'); setNotice(''); }}>Équipe</button>
+        <button type="button" role="tab" aria-selected={mode === 'cdr'} className={`segmented-option ${mode === 'cdr' ? 'segmented-option-active' : ''}`} onClick={() => { setMode('cdr'); setNotice(''); }}>Chef de rang</button>
       </div>
       {mode === 'team' ? <label className="block text-sm font-medium text-zinc-200">
         Adresse e-mail
@@ -82,7 +82,7 @@ export function AuthPanel() {
         />
       </label>
       <button
-        className="w-full rounded-xl bg-white px-4 py-3 font-bold text-zinc-950 transition hover:bg-zinc-200 disabled:cursor-wait disabled:opacity-70"
+        className="primary-button w-full disabled:cursor-wait"
         disabled={submitting}
       >
         {submitting ? 'Connexion en cours...' : 'Se connecter'}

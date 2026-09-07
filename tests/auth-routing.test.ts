@@ -61,7 +61,7 @@ describe('authentification et navigation', () => {
     expect(navigation).toContain("pathname.startsWith('/hostess')");
     expect(navigation).toContain("pathname.startsWith('/admin')");
     expect(navigation).toContain("pathname.startsWith('/recap')");
-    expect(navigation).toContain("active ? 'bg-fuchsia-600 text-white' : 'bg-zinc-800 text-zinc-100'");
+    expect(navigation).toContain("active ? 'nav-link-active' : ''");
   });
 
   it('ne traite jamais la déconnexion comme un onglet actif', () => {
