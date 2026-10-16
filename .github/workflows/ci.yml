@@ -100,8 +100,8 @@ jobs:
             echo "SUPABASE_LOCAL_ANON_KEY=$ANON_KEY"
             echo "SUPABASE_LOCAL_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
           } >>"$GITHUB_ENV"
-      - name: Run CDR access integration test
-        run: timeout 5m npm run test -- tests/cdr-access-integration.test.ts
+      - name: Run access security integration tests
+        run: timeout 5m npm run test -- tests/cdr-access-integration.test.ts tests/privileged-function-access.integration.test.ts
       - name: Show redacted Edge Function logs on failure
         if: failure()
         run: |

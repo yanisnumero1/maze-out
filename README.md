@@ -4,7 +4,7 @@ Application PWA responsive de pilotage d'une soirée. La configuration Supabase 
 
 ## Démarrer
 
-1. Créer un projet Supabase, appliquer les migrations dans l'ordre (`0001`, `0002`, `0003`), puis exécuter `supabase/seed.sql`. Le seed applique aussi la disposition du plan.
+1. Créer un projet Supabase, appliquer toutes les migrations de `supabase/migrations/` dans l'ordre numérique (jusqu'à `0039` incluse), puis exécuter `supabase/seed.sql`. Le seed applique aussi la disposition du plan.
 2. Copier `.env.example` vers `.env.local` et renseigner les clés publiques.
 3. `npm install && npm run dev`
 
@@ -56,6 +56,20 @@ RUN_CDR_ACCESS_INTEGRATION=1 npm run test -- tests/cdr-access-integration.test.t
 Le test refuse explicitement toute URL dont l’hôte n’est pas `localhost`, `127.0.0.1` ou `::1`.
 
 La CI exécute ce scénario dans un job isolé : elle démarre Supabase avec Docker, sert `manage-cdr-access`, récupère les clés éphémères avec `npx supabase status -o env`, lance uniquement le test d’intégration, puis arrête systématiquement l’environnement local. Aucun secret GitHub et aucun projet Supabase distant ne sont utilisés. En cas d’échec, seuls les logs expurgés de l’Edge Function sont affichés.
+
+### Autorisations des fonctions SQL (migration 0039)
+
+Les RLS protègent les tables ; les fonctions `SECURITY DEFINER` doivent aussi vérifier les autorisations avant leurs opérations métier. Une comparaison comme `NULL NOT IN ('admin', 'hostess')` ne déclenche pas un bloc de refus `IF` en PL/pgSQL.
+
+La migration `0039_harden_privileged_function_access.sql` conserve le correctif appliqué à la base le 16 octobre 2026. Elle ajoute un refus explicite des identités absentes ou des profils sans rôle actif aux fonctions PL/pgSQL privilégiées qui consultent `current_role()`, puis retire les droits d'exécution de `PUBLIC` et `anon` aux fonctions privilégiées du schéma `public`. Les droits effectifs existants de `authenticated` et `service_role` sont conservés. Les définitions et ACL précédentes sont sauvegardées dans le schéma privé `mazeout_security_backup`, dont la table est protégée par RLS. Le marqueur de garde évite une double insertion lorsque la migration est appliquée à une base déjà corrigée.
+
+Les tests d'intégration couvrent les appels anonymes, les utilisateurs authentifiés sans profil, les restrictions du rôle observer, les autorisations admin/hostess et les appels directs avec l'ancien JWT d'un CDR désactivé. Pour les exécuter ensemble avec la configuration locale décrite ci-dessus :
+
+```sh
+RUN_CDR_ACCESS_INTEGRATION=1 npm run test -- tests/cdr-access-integration.test.ts tests/privileged-function-access.integration.test.ts
+```
+
+La CI exécute les deux fichiers sur Supabase local. Après `0039`, toute nouvelle fonction privilégiée ou redéfinition doit conserver ces contrôles et définir explicitement ses permissions : cette migration ne modifie pas les privilèges par défaut des fonctions futures.
 
 ### Retour arrière de la migration 0038
 
