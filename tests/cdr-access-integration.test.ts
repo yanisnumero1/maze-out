@@ -101,6 +101,17 @@ describe.skipIf(!enabled)('gestion CDR avec Supabase local', () => {
     expect((await anonymous().auth.signInWithPassword({ email: cdrEmail, password: reset.body.temporaryPassword })).error).toBeTruthy();
     const { data: visibleAfterDisable } = await cdrClient.from('head_waiters').select('id');
     expect(visibleAfterDisable).toEqual([]);
+    // The old JWT still exists: database guards must reject the now-NULL role
+    // before any business operation, independently of Auth's login ban.
+    for (const [name, args] of [
+      ['open_night_session', {}],
+      ['assert_operational_role', {}],
+      ['release_operational_table', { p_table_id: '00000000-0000-0000-0000-000000000000' }],
+      ['close_current_night_session', {}],
+    ] as const) {
+      const { error } = await cdrClient.rpc(name, args);
+      expect(error?.code, `${name} must reject a disabled CDR`).toBe('42501');
+    }
     const { data: preservedWaiter } = await service.from('head_waiters').select('id').eq('id', ids.waiter).single();
     expect(preservedWaiter?.id).toBe(ids.waiter);
     const { count: visitsAfter } = await service.from('table_visits').select('id', { count: 'exact', head: true });
